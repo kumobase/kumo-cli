@@ -192,6 +192,16 @@ func resolveSecretRef(ctx context.Context, c *client.Client, name string) (uint,
 	if strings.TrimSpace(name) == "" {
 		return 0, nil, "", fmt.Errorf("secret name is required")
 	}
+	if id, ok := numericID(name); ok {
+		sec, etag, err := c.Secrets().Get(ctx, id)
+		if err != nil {
+			if client.IsNotFound(err) {
+				return 0, nil, "", friendlyf(err, "no secret with id %d", id)
+			}
+			return 0, nil, "", err
+		}
+		return sec.ID, sec, etag, nil
+	}
 	sec, etag, err := c.Secrets().GetByName(ctx, name)
 	if err != nil {
 		if client.IsCode(err, codes.AmbiguousName) {

@@ -44,7 +44,7 @@ func newVPSRentCmd() *cobra.Command {
 				Plan:     plan,
 				Name:     name,
 			}
-			v, err := c.VPS().RentServer(cmd.Context(), req)
+			v, err := c.VPS().RentServer(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return mapVPSRentError(err)
 			}
@@ -115,7 +115,7 @@ func newVPSCancelCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.VPS().CancelSubscription(cmd.Context(), id); err != nil {
+			if err := c.VPS().CancelSubscription(cmd.Context(), id, writeOpts("")...); err != nil {
 				if client.IsCode(err, codes.AutoRenewAlreadyCancelled) {
 					return printResult(cmd, output.ActionResult{
 						Resource: "vps", ID: id, Action: "cancel", Status: "noop",
@@ -147,7 +147,7 @@ func newVPSRenewCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.VPS().Renew(cmd.Context(), id); err != nil {
+			if err := c.VPS().Renew(cmd.Context(), id, writeOpts("")...); err != nil {
 				return mapVPSRentError(err)
 			}
 			return printResult(cmd, output.ActionResult{

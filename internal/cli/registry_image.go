@@ -163,7 +163,7 @@ func newRegistryImageDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Registry().Repos(org).DeleteManifest(cmd.Context(), repo, digest); err != nil {
+			if err := c.Registry().Repos(org).DeleteManifest(cmd.Context(), repo, digest, writeOpts("")...); err != nil {
 				return mapRegistryManifestError(err, digest, repo)
 			}
 			return printResult(cmd, output.ActionResult{

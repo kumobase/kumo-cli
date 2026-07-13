@@ -13,13 +13,18 @@ import (
 
 // Manifest is the YAML shape of an app spec file. Field names mirror the SDK
 // request JSON in lowerCamelCase for readability in YAML.
+//
+// The scalar fields are pointers so an absent key (nil) is distinguishable from
+// a zero value. This matters for `apps update -f`, where only the fields the
+// manifest actually set are applied — an omitted field must leave the live spec
+// unchanged rather than overwrite it with "" / 0 / false.
 type Manifest struct {
-	Name                 string                `yaml:"name"`
-	Image                string                `yaml:"image"`
-	Port                 uint16                `yaml:"port"`
-	IsExposed            bool                  `yaml:"isExposed"`
-	Replicas             int                   `yaml:"replicas"`
-	PricingSlug          string                `yaml:"pricingSlug"`
+	Name                 *string               `yaml:"name"`
+	Image                *string               `yaml:"image"`
+	Port                 *uint16               `yaml:"port"`
+	IsExposed            *bool                 `yaml:"isExposed"`
+	Replicas             *int                  `yaml:"replicas"`
+	PricingSlug          *string               `yaml:"pricingSlug"`
 	RegistryCredential   string                `yaml:"registryCredential"`
 	EnvironmentVariables []EnvVar              `yaml:"environmentVariables"`
 	SecretVars           []SecretVarSpec       `yaml:"secretVars"`
@@ -27,6 +32,34 @@ type Manifest struct {
 	TLSSecret            string                `yaml:"tlsSecret"`
 	HealthCheck          *HealthCheck          `yaml:"healthCheck"`
 	Autoscaling          *Autoscaling          `yaml:"autoscaling"`
+}
+
+func derefStr(p *string) string {
+	if p != nil {
+		return *p
+	}
+	return ""
+}
+
+func derefU16(p *uint16) uint16 {
+	if p != nil {
+		return *p
+	}
+	return 0
+}
+
+func derefBool(p *bool) bool {
+	if p != nil {
+		return *p
+	}
+	return false
+}
+
+func derefInt(p *int) int {
+	if p != nil {
+		return *p
+	}
+	return 0
 }
 
 // SecretVarSpec attaches a Kumo Secret as environment variables to the app.
@@ -79,11 +112,11 @@ func Load(path string) (*Manifest, error) {
 
 func (m *Manifest) base() types.BaseCreateApp {
 	b := types.BaseCreateApp{
-		Name:      m.Name,
-		Image:     m.Image,
-		Port:      m.Port,
-		IsExposed: m.IsExposed,
-		Replicas:  m.Replicas,
+		Name:      derefStr(m.Name),
+		Image:     derefStr(m.Image),
+		Port:      derefU16(m.Port),
+		IsExposed: derefBool(m.IsExposed),
+		Replicas:  derefInt(m.Replicas),
 	}
 	if m.Autoscaling != nil {
 		b.Autoscaling = &types.AutoscalingConfig{
@@ -154,7 +187,7 @@ func (m *Manifest) ToCreateRequest() *types.CreateAppRequest {
 	return &types.CreateAppRequest{
 		BaseCreateApp:          m.base(),
 		EnvironmentVariables:   m.envVars(),
-		PricingSlug:            m.PricingSlug,
+		PricingSlug:            derefStr(m.PricingSlug),
 		RegistryCredentialName: m.RegistryCredential,
 		TLSSecretName:          m.TLSSecret,
 		SecretVars:             m.secretVars(),
@@ -163,27 +196,48 @@ func (m *Manifest) ToCreateRequest() *types.CreateAppRequest {
 	}
 }
 
-// ToUpdateRequest converts the manifest into an UpdateAppRequest. Every field
-// the manifest carries is sent as a present pointer; absent fields are nil so
-// the server's PATCH semantics leave them unchanged.
+// ToUpdateRequest converts the manifest into a fresh UpdateAppRequest carrying
+// only the fields the manifest actually set.
 func (m *Manifest) ToUpdateRequest() *types.UpdateAppRequest {
-	name := m.Name
-	image := m.Image
-	port := m.Port
-	exposed := m.IsExposed
-	replicas := m.Replicas
-	pricing := m.PricingSlug
-	req := &types.UpdateAppRequest{
-		Name:                 &name,
-		Image:                &image,
-		Port:                 &port,
-		IsExposed:            &exposed,
-		Replicas:             &replicas,
-		PricingSlug:          &pricing,
-		EnvironmentVariables: m.envVars(),
-		SecretVars:           m.secretVars(),
-		SecretFileMounts:     m.secretFileMounts(),
-		HealthCheck:          m.healthCheck(),
+	req := &types.UpdateAppRequest{}
+	m.ApplyUpdate(req)
+	return req
+}
+
+// ApplyUpdate merges the manifest onto an existing UpdateAppRequest, overwriting
+// only the fields the manifest actually set (non-nil pointers, non-empty
+// slices/strings). Fields the manifest omits are left untouched so a partial
+// manifest preserves — rather than zeroes — the rest of the live spec.
+func (m *Manifest) ApplyUpdate(req *types.UpdateAppRequest) {
+	if m.Name != nil {
+		req.Name = m.Name
+	}
+	if m.Image != nil {
+		req.Image = m.Image
+	}
+	if m.Port != nil {
+		req.Port = m.Port
+	}
+	if m.IsExposed != nil {
+		req.IsExposed = m.IsExposed
+	}
+	if m.Replicas != nil {
+		req.Replicas = m.Replicas
+	}
+	if m.PricingSlug != nil {
+		req.PricingSlug = m.PricingSlug
+	}
+	if len(m.EnvironmentVariables) > 0 {
+		req.EnvironmentVariables = m.envVars()
+	}
+	if len(m.SecretVars) > 0 {
+		req.SecretVars = m.secretVars()
+	}
+	if len(m.SecretFileMounts) > 0 {
+		req.SecretFileMounts = m.secretFileMounts()
+	}
+	if m.HealthCheck != nil {
+		req.HealthCheck = m.healthCheck()
 	}
 	if m.Autoscaling != nil {
 		req.Autoscaling = &types.AutoscalingConfig{
@@ -202,5 +256,4 @@ func (m *Manifest) ToUpdateRequest() *types.UpdateAppRequest {
 		ts := m.TLSSecret
 		req.TLSSecretName = &ts
 	}
-	return req
 }

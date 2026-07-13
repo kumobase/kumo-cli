@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -10,6 +12,17 @@ import (
 
 	"github.com/kumobase/kumo-cli/internal/output"
 )
+
+// numericID reports whether ref is an all-digit id and returns it. A bare
+// numeric positional is treated as an id — the documented recovery when a name
+// is ambiguous (AMBIGUOUS_NAME).
+func numericID(ref string) (uint, bool) {
+	n, err := strconv.ParseUint(strings.TrimSpace(ref), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return uint(n), true
+}
 
 // outputFormat returns the output format resolved once by the root
 // PersistentPreRunE, falling back to table when unset (e.g. very early errors).

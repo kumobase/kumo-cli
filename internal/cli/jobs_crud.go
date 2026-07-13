@@ -100,7 +100,7 @@ func newJobsCreateCmd() *cobra.Command {
 				req.AppID = &id
 			}
 
-			res, err := c.Jobs().Create(cmd.Context(), req)
+			res, err := c.Jobs().Create(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return mapJobError(err, name)
 			}
@@ -248,7 +248,7 @@ func newJobsDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if _, err := c.Jobs().Delete(cmd.Context(), id); err != nil {
+			if _, err := c.Jobs().Delete(cmd.Context(), id, writeOpts("")...); err != nil {
 				return mapJobError(err, args[0])
 			}
 			return printResult(cmd, output.ActionResult{

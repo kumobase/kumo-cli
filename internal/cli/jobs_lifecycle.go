@@ -28,7 +28,7 @@ func newJobsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := c.Jobs().RunNow(cmd.Context(), id)
+			res, err := c.Jobs().RunNow(cmd.Context(), id, writeOpts("")...)
 			if err != nil {
 				return mapJobError(err, args[0])
 			}

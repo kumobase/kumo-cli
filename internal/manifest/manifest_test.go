@@ -4,7 +4,54 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kumobase/kumo-go/types"
 )
+
+// TestApplyUpdatePartialPreservesSeed is the regression guard for the
+// wholesale-replace data-loss bug: a partial manifest must overwrite only the
+// fields it set and leave the seeded live-spec fields untouched.
+func TestApplyUpdatePartialPreservesSeed(t *testing.T) {
+	path := writeManifest(t, "image: nginx:2\n")
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	name, replicas, port, exposed := "existing", 3, uint16(8080), true
+	req := &types.UpdateAppRequest{Name: &name, Replicas: &replicas, Port: &port, IsExposed: &exposed}
+	m.ApplyUpdate(req)
+
+	if req.Image == nil || *req.Image != "nginx:2" {
+		t.Errorf("image should be applied from manifest: %v", req.Image)
+	}
+	if req.Name == nil || *req.Name != "existing" {
+		t.Errorf("name should be preserved, got %v", req.Name)
+	}
+	if req.Replicas == nil || *req.Replicas != 3 {
+		t.Errorf("replicas should be preserved (not zeroed), got %v", req.Replicas)
+	}
+	if req.Port == nil || *req.Port != 8080 {
+		t.Errorf("port should be preserved, got %v", req.Port)
+	}
+	if req.IsExposed == nil || !*req.IsExposed {
+		t.Errorf("isExposed should be preserved, got %v", req.IsExposed)
+	}
+}
+
+// TestApplyUpdateExplicitZeroHonored confirms an explicitly-set zero is applied
+// (distinct from an omitted field).
+func TestApplyUpdateExplicitZeroHonored(t *testing.T) {
+	path := writeManifest(t, "replicas: 0\n")
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	req := &types.UpdateAppRequest{}
+	m.ApplyUpdate(req)
+	if req.Replicas == nil || *req.Replicas != 0 {
+		t.Errorf("explicit replicas:0 should be applied, got %v", req.Replicas)
+	}
+}
 
 func writeManifest(t *testing.T, body string) string {
 	t.Helper()

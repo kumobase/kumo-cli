@@ -39,7 +39,7 @@ func newAppsDomainAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			info, err := c.Apps().AddCustomDomain(cmd.Context(), id, args[1])
+			info, err := c.Apps().AddCustomDomain(cmd.Context(), id, args[1], writeOpts("")...)
 			if err != nil {
 				return err
 			}

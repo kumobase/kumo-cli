@@ -91,13 +91,23 @@ func resolveAPIKeyRef(ctx context.Context, c *client.Client, name string) (uint,
 	if strings.TrimSpace(name) == "" {
 		return 0, nil, fmt.Errorf("api key name is required")
 	}
+	if id, ok := numericID(name); ok {
+		k, err := c.APIKeys().Get(ctx, id)
+		if err != nil {
+			if client.IsNotFound(err) {
+				return 0, nil, friendlyf(err, "no api key with id %d", id)
+			}
+			return 0, nil, err
+		}
+		return k.ID, k, nil
+	}
 	k, err := c.APIKeys().GetByName(ctx, name)
 	if err != nil {
 		if client.IsCode(err, codes.AmbiguousName) {
-			return 0, nil, fmt.Errorf("multiple api keys named %q exist; rename one (kumo apikey list) to disambiguate", name)
+			return 0, nil, friendlyf(err, "multiple api keys named %q exist; use the numeric id (kumo apikey list) to disambiguate", name)
 		}
 		if client.IsNotFound(err) {
-			return 0, nil, fmt.Errorf("no api key named %q", name)
+			return 0, nil, friendlyf(err, "no api key named %q", name)
 		}
 		if mapped := mapAPIKeySessionError(err); mapped != err {
 			return 0, nil, mapped

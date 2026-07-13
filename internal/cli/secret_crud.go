@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -18,14 +19,33 @@ import (
 
 // secretPayloadFlags holds the type-specific create/update flag values.
 type secretPayloadFlags struct {
-	registryHost string
-	registryUser string
-	registryPass string
-	envs         []string
-	fromFile     string
-	content      string
-	certFile     string
-	keyFile      string
+	registryHost      string
+	registryUser      string
+	registryPass      string
+	registryPassStdin bool
+	envs              []string
+	fromFile          string
+	content           string
+	certFile          string
+	keyFile           string
+}
+
+// resolveRegistryPassword reads the registry password from stdin when
+// --registry-password-stdin is set, keeping the credential out of shell history
+// and the process table. A trailing newline is trimmed.
+func resolveRegistryPassword(cmd *cobra.Command, p *secretPayloadFlags) error {
+	if !p.registryPassStdin {
+		return nil
+	}
+	if p.registryPass != "" {
+		return fmt.Errorf("pass either --registry-password or --registry-password-stdin, not both")
+	}
+	b, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return fmt.Errorf("read registry password from stdin: %w", err)
+	}
+	p.registryPass = strings.TrimRight(string(b), "\r\n")
+	return nil
 }
 
 // secretFlagsByType maps each secret type to the names of the payload flags
@@ -44,6 +64,7 @@ func addSecretPayloadFlags(cmd *cobra.Command, p *secretPayloadFlags) {
 	f.StringVar(&p.registryHost, "registry-host", "", "registry host (registry type; defaults to Docker Hub)")
 	f.StringVar(&p.registryUser, "registry-username", "", "registry username (registry type)")
 	f.StringVar(&p.registryPass, "registry-password", "", "registry password (registry type)")
+	f.BoolVar(&p.registryPassStdin, "registry-password-stdin", false, "read the registry password from stdin (registry type)")
 	f.StringArrayVar(&p.envs, "env", nil, "environment variable KEY=VALUE (env_var type, repeatable)")
 	f.StringVar(&p.fromFile, "from-file", "", "read file content from a path (file type)")
 	f.StringVar(&p.content, "content", "", "inline file content (file type)")
@@ -106,6 +127,9 @@ func newSecretCreateCmd() *cobra.Command {
 				return err
 			}
 
+			if err := resolveRegistryPassword(cmd, &payload); err != nil {
+				return err
+			}
 			req := &types.CreateSecretRequest{
 				RequestSecretBase: types.RequestSecretBase{Name: name, Type: t},
 			}
@@ -117,7 +141,7 @@ func newSecretCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := c.Secrets().Create(cmd.Context(), req)
+			res, err := c.Secrets().Create(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return err
 			}
@@ -230,6 +254,9 @@ func newSecretUpdateCmd() *cobra.Command {
 			if err := assertNoForeignSecretFlags(cmd, current.Type); err != nil {
 				return err
 			}
+			if err := resolveRegistryPassword(cmd, &payload); err != nil {
+				return err
+			}
 
 			req := updateRequestFromSecret(current)
 			f := cmd.Flags()
@@ -290,7 +317,7 @@ func applySecretPayloadOverrides(cmd *cobra.Command, req *types.UpdateSecretRequ
 		if f.Changed("registry-username") {
 			req.SecretRegistry.Username = p.registryUser
 		}
-		if f.Changed("registry-password") {
+		if f.Changed("registry-password") || p.registryPassStdin {
 			req.SecretRegistry.Password = p.registryPass
 		}
 	case types.SecretTypeEnvVar:
@@ -344,7 +371,7 @@ func newSecretDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Secrets().Delete(cmd.Context(), id); err != nil {
+			if err := c.Secrets().Delete(cmd.Context(), id, writeOpts("")...); err != nil {
 				if client.IsCode(err, codes.SecretInUse) {
 					return fmt.Errorf("secret %d is in use by one or more apps; run `kumo secret get %d` to see them, detach it, then retry: %w", id, id, err)
 				}

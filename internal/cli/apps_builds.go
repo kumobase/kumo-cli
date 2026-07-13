@@ -158,7 +158,7 @@ func newAppsBuildsRebuildCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			b, err := c.Builds().Rebuild(cmd.Context(), appID)
+			b, err := c.Builds().Rebuild(cmd.Context(), appID, writeOpts("")...)
 			if err != nil {
 				return mapBuildError(err, appID)
 			}
@@ -393,7 +393,7 @@ func runGitBuildCreate(cmd *cobra.Command, p gitBuildParams) error {
 		}
 	}
 
-	res, err := c.Builds().CreateGitBuildApp(cmd.Context(), connID, req)
+	res, err := c.Builds().CreateGitBuildApp(cmd.Context(), connID, req, writeOpts("")...)
 	if err != nil {
 		return mapBuildError(err, 0)
 	}

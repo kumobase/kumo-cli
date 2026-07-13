@@ -189,7 +189,7 @@ func newAppsCreateCmd() *cobra.Command {
 			}
 
 			if !wait {
-				res, err := c.Apps().Create(cmd.Context(), req)
+				res, err := c.Apps().Create(cmd.Context(), req, writeOpts("")...)
 				if err != nil {
 					return err
 				}
@@ -295,7 +295,9 @@ func newAppsUpdateCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				req = m.ToUpdateRequest()
+				// Merge onto the live-spec seed so a partial manifest updates
+				// only the fields it set (fixes the wholesale-replace footgun).
+				m.ApplyUpdate(req)
 			}
 
 			f := cmd.Flags()
@@ -566,7 +568,7 @@ func newAppsDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Apps().Delete(cmd.Context(), id); err != nil {
+			if err := c.Apps().Delete(cmd.Context(), id, writeOpts("")...); err != nil {
 				return err
 			}
 			if !wait {

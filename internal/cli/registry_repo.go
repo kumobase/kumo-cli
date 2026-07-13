@@ -138,7 +138,7 @@ func newRegistryRepoCreateCmd() *cobra.Command {
 				}
 				req.TagMutability = types.TagMutability(tm)
 			}
-			r, err := c.Registry().Repos(org).Create(cmd.Context(), req)
+			r, err := c.Registry().Repos(org).Create(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return mapRegistryError(err)
 			}
@@ -223,7 +223,7 @@ func newRegistryRepoDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Registry().Repos(org).Delete(cmd.Context(), name); err != nil {
+			if err := c.Registry().Repos(org).Delete(cmd.Context(), name, writeOpts("")...); err != nil {
 				return mapRegistryRepoError(err, name)
 			}
 			return printResult(cmd, output.ActionResult{

@@ -59,7 +59,7 @@ func newVolumeCreateCmd() *cobra.Command {
 				req.AppName = appName
 			}
 
-			created, err := c.Volumes().Create(cmd.Context(), req)
+			created, err := c.Volumes().Create(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return mapVolumeCreateError(err)
 			}
@@ -160,7 +160,7 @@ func newVolumeDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Volumes().Delete(cmd.Context(), id); err != nil {
+			if err := c.Volumes().Delete(cmd.Context(), id, writeOpts("")...); err != nil {
 				if client.IsCode(err, codes.VolumeAttached) {
 					return fmt.Errorf("volume is attached; run `kumo volume detach %s` first: %w", v.Name, err)
 				}

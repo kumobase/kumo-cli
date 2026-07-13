@@ -134,13 +134,23 @@ func resolveJobRef(ctx context.Context, c *client.Client, name string) (uint, *t
 	if strings.TrimSpace(name) == "" {
 		return 0, nil, fmt.Errorf("job name is required")
 	}
+	if id, ok := numericID(name); ok {
+		j, _, err := c.Jobs().Get(ctx, id)
+		if err != nil {
+			if client.IsNotFound(err) || client.IsCode(err, codes.JobNotFound) {
+				return 0, nil, friendlyf(err, "no job with id %d", id)
+			}
+			return 0, nil, mapJobError(err, name)
+		}
+		return j.ID, j, nil
+	}
 	j, _, err := c.Jobs().GetByName(ctx, name)
 	if err != nil {
 		if client.IsCode(err, codes.AmbiguousName) {
-			return 0, nil, fmt.Errorf("multiple jobs named %q exist; rename one (kumo jobs list) to disambiguate", name)
+			return 0, nil, friendlyf(err, "multiple jobs named %q exist; use the numeric id (kumo jobs list) to disambiguate", name)
 		}
 		if client.IsNotFound(err) || client.IsCode(err, codes.JobNotFound) {
-			return 0, nil, fmt.Errorf("no job named %q", name)
+			return 0, nil, friendlyf(err, "no job named %q", name)
 		}
 		return 0, nil, mapJobError(err, name)
 	}

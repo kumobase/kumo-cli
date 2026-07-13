@@ -148,7 +148,7 @@ func newRegistryOrgCreateCmd() *cobra.Command {
 				return err
 			}
 			req := &types.CreateOrganizationRequest{Slug: args[0], DisplayName: displayName}
-			o, err := c.Registry().Orgs().Create(cmd.Context(), req)
+			o, err := c.Registry().Orgs().Create(cmd.Context(), req, writeOpts("")...)
 			if err != nil {
 				return mapRegistryError(err)
 			}
@@ -234,7 +234,7 @@ func newRegistryOrgDeleteCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if err := c.Registry().Orgs().Delete(cmd.Context(), slug); err != nil {
+			if err := c.Registry().Orgs().Delete(cmd.Context(), slug, writeOpts("")...); err != nil {
 				if client.IsCode(err, codes.OrgCannotDeleteDefault) {
 					return fmt.Errorf("org %q is the default organization and cannot be deleted", slug)
 				}

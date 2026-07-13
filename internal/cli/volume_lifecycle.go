@@ -43,7 +43,7 @@ func newVolumeAttachCmd() *cobra.Command {
 				MountPath:        mount,
 				ForceReconfigure: force,
 			}
-			res, err := c.Volumes().Attach(cmd.Context(), id, req)
+			res, err := c.Volumes().Attach(cmd.Context(), id, req, writeOpts("")...)
 			if err != nil {
 				return mapVolumeAttachError(err, v.Status)
 			}
@@ -93,7 +93,7 @@ func newVolumeDetachCmd() *cobra.Command {
 					return printAborted(cmd)
 				}
 			}
-			if _, err := c.Volumes().Detach(cmd.Context(), id); err != nil {
+			if _, err := c.Volumes().Detach(cmd.Context(), id, writeOpts("")...); err != nil {
 				return mapVolumeBusyError(err, v.Status)
 			}
 			return printResult(cmd, output.ActionResult{
@@ -144,7 +144,7 @@ func newVolumeResizeCmd() *cobra.Command {
 					Message: fmt.Sprintf("Volume %d resized to %d GB (status %s)", res.ID, res.SizeGB, res.Status),
 				})
 			}
-			if _, err := c.Volumes().Resize(cmd.Context(), id, req); err != nil {
+			if _, err := c.Volumes().Resize(cmd.Context(), id, req, writeOpts("")...); err != nil {
 				return mapVolumeResizeError(err, v.Status, v.Name)
 			}
 			return printResult(cmd, output.ActionResult{
