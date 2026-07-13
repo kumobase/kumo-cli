@@ -37,6 +37,11 @@ func newJobsCreateCmd() *cobra.Command {
 			"A standalone job runs its own --image. An app-attached job reuses an\n" +
 			"existing app's image (--app). Omit --schedule for a manual (one-off) job;\n" +
 			"give a cron expression for a scheduled job.",
+		Example: `  # One-off standalone job
+  kumo jobs create --name migrate --image myrepo/tools:v1 --command "./migrate"
+
+  # Scheduled (cron) app-attached job
+  kumo jobs create --name nightly --app web --schedule "0 3 * * *" --command "rake cleanup"`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			k, err := parseJobKind(kind)

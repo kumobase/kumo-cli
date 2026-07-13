@@ -46,6 +46,9 @@ func newAppsCreateCmd() *cobra.Command {
 		dockerfilePath string
 		outputDir      string
 		buildCommand   string
+
+		asFlags autoscaleFlags
+		hcFlags healthCheckFlags
 	)
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -53,6 +56,19 @@ func newAppsCreateCmd() *cobra.Command {
 		Long: "Create an application from a registry image (--image) or from a git source\n" +
 			"(--git <connID> --repo <owner/repo>), and/or a manifest file (-f app.yaml).\n" +
 			"When both flags and a manifest are given, flags override the manifest.",
+		Example: `  # From a registry image, exposed publicly
+  kumo apps create --name web --image nginx:1.27 --port 80 --exposed
+
+  # With autoscaling and a secret mounted as env vars
+  kumo apps create --name api --image myrepo/api:v1 --port 8080 \
+    --autoscale --min-replicas 2 --max-replicas 6 --cpu-target 70 \
+    --secret-var db-creds:restart
+
+  # From a git source connection (build on push)
+  kumo apps create --name site --git 12 --repo acme/site --language nodejs --port 3000
+
+  # Declaratively from a manifest
+  kumo apps create -f app.yaml`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Git-build path: a separate SDK surface (source-based, no image
@@ -67,6 +83,7 @@ func newAppsCreateCmd() *cobra.Command {
 					connID: gitConn, connSet: f0.Changed("git"), repo: repo,
 					branch: branch, tagPattern: tagPattern, language: language,
 					dockerfilePath: dockerfilePath, outputDir: outputDir, buildCommand: buildCommand,
+					autoscaling: asFlags.build(f0), healthCheck: hcFlags.build(f0),
 				})
 			}
 
@@ -126,6 +143,12 @@ func newAppsCreateCmd() *cobra.Command {
 			if certificateSecretsEnabled && f.Changed("tls-secret") {
 				req.TLSSecretName = tlsSecret
 				req.TLSSecretId = nil
+			}
+			if as := asFlags.build(f); as != nil {
+				req.Autoscaling = as
+			}
+			if hc := hcFlags.build(f); hc != nil {
+				req.HealthCheck = hc
 			}
 
 			if req.Name == "" || req.Image == "" {
@@ -241,6 +264,8 @@ func newAppsCreateCmd() *cobra.Command {
 	f.StringVar(&dockerfilePath, "dockerfile-path", "", "Dockerfile path (with --language dockerfile)")
 	f.StringVar(&outputDir, "output-dir", "", "static output dir to serve (with --language static)")
 	f.StringVar(&buildCommand, "build-command", "", "build command before serving (with --language static)")
+	addAutoscaleFlags(f, &asFlags)
+	addHealthCheckFlags(f, &hcFlags)
 	return cmd
 }
 
@@ -269,6 +294,8 @@ func newAppsUpdateCmd() *cobra.Command {
 		skipSecretChecks   bool
 		wait               bool
 		timeout            time.Duration
+		asFlags            autoscaleFlags
+		hcFlags            healthCheckFlags
 	)
 	cmd := &cobra.Command{
 		Use:   "update <name>",
@@ -356,6 +383,12 @@ func newAppsUpdateCmd() *cobra.Command {
 				req.TLSSecretName = &v
 				req.TLSSecretId = nil
 			}
+			if as := asFlags.build(f); as != nil {
+				req.Autoscaling = as
+			}
+			if hc := hcFlags.build(f); hc != nil {
+				req.HealthCheck = hc
+			}
 
 			if !skipSecretChecks {
 				regCred := ""
@@ -419,6 +452,8 @@ func newAppsUpdateCmd() *cobra.Command {
 	f.BoolVar(&skipSecretChecks, "skip-secret-checks", false, "skip client-side validation that attached secrets exist and match the expected type")
 	f.BoolVar(&wait, "wait", true, "wait for the update to complete")
 	f.DurationVar(&timeout, "timeout", pollTimeout, "max time to wait when --wait is set")
+	addAutoscaleFlags(f, &asFlags)
+	addHealthCheckFlags(f, &hcFlags)
 	return cmd
 }
 

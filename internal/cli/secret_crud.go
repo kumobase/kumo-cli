@@ -111,6 +111,15 @@ func newSecretCreateCmd() *cobra.Command {
 		Long: "Create a secret of a given --type. Provide exactly the payload flags for\n" +
 			"that type: registry (--registry-username/--registry-password), env_var\n" +
 			"(--env), or file (--from-file/--content).",
+		Example: `  # Registry credentials (password read from stdin, not shell history)
+  printf '%s' "$TOKEN" | kumo secret create --name dockerhub --type registry \
+    --registry-username alice --registry-password-stdin
+
+  # Env-var group
+  kumo secret create --name db --type env_var --env HOST=db --env PORT=5432
+
+  # File mount from disk
+  kumo secret create --name cfg --type file --from-file ./app.conf`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {

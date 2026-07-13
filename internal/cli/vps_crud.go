@@ -20,7 +20,10 @@ func newVPSRentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rent",
 		Short: "Rent a new VPS instance",
-		Args:  cobra.NoArgs,
+		Example: `  # List plans for a region first, then rent
+  kumo vps plans --region sg-singapore
+  kumo vps rent --name web1 --provider zeabur --region sg-singapore --plan sg-1c-1g`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")

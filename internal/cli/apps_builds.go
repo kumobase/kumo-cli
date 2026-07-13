@@ -296,6 +296,8 @@ type gitBuildParams struct {
 	repo, branch, tagPattern       string
 	language, dockerfilePath       string
 	outputDir, buildCommand        string
+	autoscaling                    *types.AutoscalingConfig
+	healthCheck                    *types.HealthCheck
 }
 
 // runGitBuildCreate creates a git-build app via the Builds service. It is the
@@ -358,6 +360,8 @@ func runGitBuildCreate(cmd *cobra.Command, p gitBuildParams) error {
 		OutputDir:      p.outputDir,
 		BuildCommand:   p.buildCommand,
 		PricingSlug:    p.pricingSlug,
+		Autoscaling:    p.autoscaling,
+		HealthCheck:    p.healthCheck,
 	}
 	ev, err := parseEnvFlags(p.envs)
 	if err != nil {
