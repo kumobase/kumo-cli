@@ -4,6 +4,9 @@
 *.test
 *.out
 
+# GoReleaser build output
+/dist/
+
 # Local env
 .env
 .env.local
