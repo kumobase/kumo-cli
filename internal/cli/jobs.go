@@ -21,6 +21,9 @@ func newJobsCmd() *cobra.Command {
 		Use:     "jobs",
 		Aliases: []string{"job"},
 		Short:   "Manage jobs (one-off and scheduled workloads)",
+		Long: "Manage one-off and scheduled jobs, and inspect their executions.\n\n" +
+			"Note: per-execution logs and metrics are not yet available via the CLI\n" +
+			"(the SDK exposes no endpoint for them); view them in the Kumo dashboard.",
 	}
 	cmd.AddCommand(
 		newJobsListCmd(),

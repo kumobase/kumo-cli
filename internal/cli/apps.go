@@ -16,8 +16,14 @@ import (
 
 func newAppsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apps",
-		Short: "Manage applications",
+		Use:     "apps",
+		Aliases: []string{"app"},
+		Short:   "Manage applications",
+		Long: "Manage applications: deploy from a registry image or git source, update,\n" +
+			"scale, and manage custom domains and builds.\n\n" +
+			"Note: runtime application logs and metrics are not yet available via the\n" +
+			"CLI (the SDK exposes no endpoint for them); view them in the Kumo\n" +
+			"dashboard. `kumo apps builds logs` prints build logs for git-build apps.",
 	}
 	cmd.AddCommand(
 		newAppsListCmd(),
