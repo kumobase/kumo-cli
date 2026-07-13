@@ -1,0 +1,22 @@
+# Example Kumo app manifest. Use with: kumo apps create -f testdata/app.yaml
+name: my-demo-app
+image: nginx:1.27
+port: 80
+isExposed: true
+replicas: 2
+pricingSlug: app-small
+
+environmentVariables:
+  - key: LOG_LEVEL
+    value: info
+
+healthCheck:
+  type: http
+  path: /healthz
+  port: 80
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  cpuTargetPercentage: 70

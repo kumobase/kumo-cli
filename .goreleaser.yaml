@@ -1,0 +1,93 @@
+version: 2
+
+project_name: kumo
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: kumo
+    binary: kumo
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/kumobase/kumo-cli/internal/version.Version={{ .Version }}
+
+archives:
+  - id: kumo
+    ids:
+      - kumo
+    # kumo_0.1.0_linux_x86_64.tar.gz   (or .zip on Windows)
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macos
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: CI / release
+      regexp: "^.*ci[(\\w)]*:+.*$"
+      order: 2
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: kumobase
+    name: kumo-cli
+  draft: false
+  prerelease: auto
+  name_template: "kumo {{ .Tag }}"
+  footer: |
+    ---
+    **One-line install**
+
+    ```sh
+    curl -sSfL https://raw.githubusercontent.com/kumobase/kumo-cli/main/install.sh | sh
+    ```
+
+    Pin a specific version with `KUMO_VERSION={{ .Tag }}` before the pipe.
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"

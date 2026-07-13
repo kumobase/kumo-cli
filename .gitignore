@@ -1,0 +1,14 @@
+# Binaries
+/kumo
+*.exe
+*.test
+*.out
+
+# Local env
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
