@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -16,13 +17,15 @@ import (
 func newVPSRentCmd() *cobra.Command {
 	var (
 		name, provider, region, plan string
+		wait                         bool
+		timeout                      time.Duration
 	)
 	cmd := &cobra.Command{
 		Use:   "rent",
 		Short: "Rent a new VPS instance",
-		Example: `  # List plans for a region first, then rent
+		Example: `  # List plans for a region first, then rent and wait until it's running
   kumo vps plans --region sg-singapore
-  kumo vps rent --name web1 --provider zeabur --region sg-singapore --plan sg-1c-1g`,
+  kumo vps rent --name web1 --provider zeabur --region sg-singapore --plan sg-1c-1g --wait`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
@@ -51,6 +54,13 @@ func newVPSRentCmd() *cobra.Command {
 			if err != nil {
 				return mapVPSRentError(err)
 			}
+			if wait {
+				ready, werr := waitForVPSRunning(cmd, c, v.ID, timeout)
+				if werr != nil {
+					return werr
+				}
+				v = ready
+			}
 			return output.Print(cmd.OutOrStdout(), s.Output, v, func(tw *tabwriter.Writer) {
 				fmt.Fprintf(tw, "Rented vps %q (id %d, status %s)\n", vpsDisplayName(v), v.ID, v.Status)
 			})
@@ -61,7 +71,36 @@ func newVPSRentCmd() *cobra.Command {
 	f.StringVar(&provider, "provider", "", "provider name (required)")
 	f.StringVar(&region, "region", "", "region id (required)")
 	f.StringVar(&plan, "plan", "", "plan id (required)")
+	f.BoolVar(&wait, "wait", false, "wait until the server reaches the running state")
+	f.DurationVar(&timeout, "timeout", pollTimeout, "max time to wait when --wait is set")
 	return cmd
+}
+
+// waitForVPSRunning polls a freshly-rented server until it is running, with
+// geometric backoff. There is no RentAndWait in the SDK.
+func waitForVPSRunning(cmd *cobra.Command, c *client.Client, id uint, timeout time.Duration) (*types.VPSServerResponse, error) {
+	deadline := time.Now().Add(timeout)
+	interval := 2 * time.Second
+	for {
+		v, err := c.VPS().GetServer(cmd.Context(), id)
+		if err != nil {
+			return nil, err
+		}
+		if v.Status == "running" {
+			return v, nil
+		}
+		if time.Now().After(deadline) {
+			return v, fmt.Errorf("timed out after %s waiting for vps %d to run (status %s)", timeout, id, v.Status)
+		}
+		select {
+		case <-cmd.Context().Done():
+			return nil, cmd.Context().Err()
+		case <-time.After(interval):
+		}
+		if interval = time.Duration(float64(interval) * 1.5); interval > 30*time.Second {
+			interval = 30 * time.Second
+		}
+	}
 }
 
 func newVPSRenameCmd() *cobra.Command {

@@ -15,12 +15,16 @@ import (
 )
 
 func newJobsRunCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		wait    bool
+		timeout time.Duration
+	)
+	cmd := &cobra.Command{
 		Use:   "run <name>",
 		Short: "Trigger a job run now",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, s, err := newClient()
+			c, _, err := newClient()
 			if err != nil {
 				return err
 			}
@@ -32,10 +36,56 @@ func newJobsRunCmd() *cobra.Command {
 			if err != nil {
 				return mapJobError(err, args[0])
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, res, func(tw *tabwriter.Writer) {
-				fmt.Fprintf(tw, "Started execution %d for job %d — status %s\n", res.ExecutionID, id, res.Status)
+			if !wait {
+				return printResult(cmd, output.ActionResult{
+					Resource: "job", ID: id, Action: "run", Status: string(res.Status),
+					Message: fmt.Sprintf("Started execution %d for job %d — status %s", res.ExecutionID, id, res.Status),
+				})
+			}
+			ex, err := waitForJobExecution(cmd, c, id, res.ExecutionID, timeout)
+			if err != nil {
+				return err
+			}
+			// A failed/timed-out execution returns a non-nil error so the process
+			// exits non-zero and an agent can branch on it.
+			if ex.Status == types.JobExecutionStatusFailed || ex.Status == types.JobExecutionStatusTimeout {
+				return fmt.Errorf("job execution %d ended with status %s", ex.ID, ex.Status)
+			}
+			return printResult(cmd, output.ActionResult{
+				Resource: "job", ID: id, Action: "run", Status: string(ex.Status),
+				Message: fmt.Sprintf("Execution %d for job %d finished — status %s", ex.ID, id, ex.Status),
 			})
 		},
+	}
+	addWaitFlags(cmd, &wait, &timeout, false)
+	return cmd
+}
+
+// waitForJobExecution polls a job execution until it reaches a terminal state,
+// with geometric backoff.
+func waitForJobExecution(cmd *cobra.Command, c *client.Client, jobID, execID uint, timeout time.Duration) (*types.JobExecution, error) {
+	deadline := time.Now().Add(timeout)
+	interval := 2 * time.Second
+	for {
+		ex, err := c.Jobs().GetExecution(cmd.Context(), jobID, execID)
+		if err != nil {
+			return nil, err
+		}
+		switch ex.Status {
+		case types.JobExecutionStatusSucceeded, types.JobExecutionStatusFailed, types.JobExecutionStatusTimeout:
+			return ex, nil
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("timed out after %s waiting for job execution %d", timeout, execID)
+		}
+		select {
+		case <-cmd.Context().Done():
+			return nil, cmd.Context().Err()
+		case <-time.After(interval):
+		}
+		if interval = time.Duration(float64(interval) * 1.5); interval > 30*time.Second {
+			interval = 30 * time.Second
+		}
 	}
 }
 
