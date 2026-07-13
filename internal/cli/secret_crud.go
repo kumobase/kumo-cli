@@ -341,8 +341,7 @@ func newSecretDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Secrets().Delete(cmd.Context(), id); err != nil {
@@ -351,8 +350,10 @@ func newSecretDeleteCmd() *cobra.Command {
 				}
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Secret %d deleted\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "secret", ID: id, Action: "delete", Status: "done",
+				Message: fmt.Sprintf("Secret %d deleted", id),
+			})
 		},
 	}
 	return cmd

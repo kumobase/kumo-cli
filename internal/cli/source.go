@@ -117,7 +117,7 @@ func newSourceDisconnectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			c, s, err := newClient()
+			c, _, err := newClient()
 			if err != nil {
 				return err
 			}
@@ -127,13 +127,13 @@ func newSourceDisconnectCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					return printAborted(cmd, s.Output)
+					return printAborted(cmd)
 				}
 			}
 			if _, err := c.SourceConnections().Disconnect(cmd.Context(), id); err != nil {
 				return mapSourceError(err, id)
 			}
-			return output.PrintResult(cmd.OutOrStdout(), s.Output, flagQuiet, output.ActionResult{
+			return printResult(cmd, output.ActionResult{
 				Resource: "source-connection", ID: id, Action: "disconnect", Status: "done",
 				Message: fmt.Sprintf("Source connection %d disconnected", id),
 			})

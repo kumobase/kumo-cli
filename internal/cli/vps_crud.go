@@ -82,8 +82,10 @@ func newVPSRenameCmd() *cobra.Command {
 			if err := c.VPS().UpdateServerName(cmd.Context(), id, newName); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Renamed vps %d to %q\n", id, newName)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "vps", ID: id, Action: "rename", Status: "done",
+				Message: fmt.Sprintf("Renamed vps %d to %q", id, newName),
+			})
 		},
 	}
 	cmd.Flags().StringVar(&newName, "new-name", "", "new display name (required)")
@@ -110,19 +112,22 @@ func newVPSCancelCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.VPS().CancelSubscription(cmd.Context(), id); err != nil {
 				if client.IsCode(err, codes.AutoRenewAlreadyCancelled) {
-					fmt.Fprintf(cmd.OutOrStdout(), "Auto-renewal already cancelled; server runs until %s\n", formatVPSDate(v.ExpiresAt))
-					return nil
+					return printResult(cmd, output.ActionResult{
+						Resource: "vps", ID: id, Action: "cancel", Status: "noop",
+						Message: fmt.Sprintf("Auto-renewal already cancelled; server runs until %s", formatVPSDate(v.ExpiresAt)),
+					})
 				}
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Auto-renewal cancelled; server runs until ExpiresAt: %s\n", formatVPSDate(v.ExpiresAt))
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "vps", ID: id, Action: "cancel", Status: "done",
+				Message: fmt.Sprintf("Auto-renewal cancelled; server runs until ExpiresAt: %s", formatVPSDate(v.ExpiresAt)),
+			})
 		},
 	}
 	return cmd
@@ -145,8 +150,10 @@ func newVPSRenewCmd() *cobra.Command {
 			if err := c.VPS().Renew(cmd.Context(), id); err != nil {
 				return mapVPSRentError(err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Renewed vps %d\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "vps", ID: id, Action: "renew", Status: "done",
+				Message: fmt.Sprintf("Renewed vps %d", id),
+			})
 		},
 	}
 }

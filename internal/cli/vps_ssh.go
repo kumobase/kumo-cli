@@ -65,8 +65,7 @@ func newVPSResetPasswordCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			pw, err := c.VPS().ResetPassword(cmd.Context(), id)

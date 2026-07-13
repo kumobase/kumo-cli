@@ -155,16 +155,17 @@ func newAppsBuildsRebuildCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			b, err := c.Builds().Rebuild(cmd.Context(), appID)
 			if err != nil {
 				return mapBuildError(err, appID)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Build %d queued (status %s)\n", b.ID, b.Status)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "build", ID: b.ID, Action: "rebuild", Status: string(b.Status),
+				Message: fmt.Sprintf("Build %d queued (status %s)", b.ID, b.Status),
+			})
 		},
 	}
 	return cmd
@@ -184,12 +185,23 @@ func newAppsBuildsCancelCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if !flagYes {
+				ok, err := confirm(cmd, fmt.Sprintf("Cancel build %d for app %q?", buildID, args[0]))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return printAborted(cmd)
+				}
+			}
 			b, err := c.Builds().Cancel(cmd.Context(), appID, buildID)
 			if err != nil {
 				return mapBuildError(err, appID)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Build %d %s\n", b.ID, b.Status)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "build", ID: b.ID, Action: "cancel", Status: string(b.Status),
+				Message: fmt.Sprintf("Build %d %s", b.ID, b.Status),
+			})
 		},
 	}
 }

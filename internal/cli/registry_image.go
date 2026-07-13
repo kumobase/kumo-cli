@@ -160,15 +160,16 @@ func newRegistryImageDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Registry().Repos(org).DeleteManifest(cmd.Context(), repo, digest); err != nil {
 				return mapRegistryManifestError(err, digest, repo)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Image %s deleted from %s/%s\n", digest, org, repo)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "registry-image", Action: "delete", Status: "done",
+				Message: fmt.Sprintf("Image %s deleted from %s/%s", digest, org, repo),
+			})
 		},
 	}
 	f := cmd.Flags()

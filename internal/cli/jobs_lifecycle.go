@@ -70,8 +70,10 @@ func newJobsToggleCmd(use, short string, action func(context.Context, *client.Cl
 			if _, err := action(cmd.Context(), c, id); err != nil {
 				return mapJobError(err, args[0])
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Job %d %s\n", id, pastTense)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "job", ID: id, Action: use, Status: "done",
+				Message: fmt.Sprintf("Job %d %s", id, pastTense),
+			})
 		},
 	}
 }

@@ -39,7 +39,7 @@ func TestAppsBuildsCancel(t *testing.T) {
 	srv := newServer(t, mux)
 	mockEnv(t, srv.URL)
 
-	out, _, err := runCLI("apps", "builds", "cancel", "web-app", "7")
+	out, _, err := runCLI("apps", "builds", "cancel", "web-app", "7", "-y")
 	if err != nil {
 		t.Fatalf("apps builds cancel: %v", err)
 	}

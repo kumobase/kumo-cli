@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kumobase/kumo-go/client"
+
+	"github.com/kumobase/kumo-cli/internal/output"
 )
 
 func newVPSStartCmd() *cobra.Command {
@@ -67,22 +69,25 @@ func newVPSReinstallCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if !wait {
 				if err := c.VPS().Reinstall(cmd.Context(), id); err != nil {
 					return mapVPSActionError(err, args[0], v.Status)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Action queued; poll `kumo vps get %s`\n", args[0])
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "vps", ID: id, Action: "reinstall", Status: "queued",
+					Message: fmt.Sprintf("Action queued; poll `kumo vps get %s`", args[0]),
+				})
 			}
 			if _, err := c.VPS().ReinstallAndWait(cmd.Context(), id, pollOpts(timeout)...); err != nil {
 				return mapVPSActionError(err, args[0], v.Status)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "VPS %d reinstalled\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "vps", ID: id, Action: "reinstall", Status: "done",
+				Message: fmt.Sprintf("VPS %d reinstalled", id),
+			})
 		},
 	}
 	f := cmd.Flags()
@@ -116,14 +121,18 @@ func newVPSPowerCmd(use, short, pastTense string,
 				if err := noWait(cmd.Context(), c, id); err != nil {
 					return mapVPSActionError(err, args[0], v.Status)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Action queued; poll `kumo vps get %s`\n", args[0])
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "vps", ID: id, Action: use, Status: "queued",
+					Message: fmt.Sprintf("Action queued; poll `kumo vps get %s`", args[0]),
+				})
 			}
 			if err := withWait(cmd.Context(), c, id, timeout); err != nil {
 				return mapVPSActionError(err, args[0], v.Status)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "VPS %d %s\n", id, pastTense)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "vps", ID: id, Action: use, Status: "done",
+				Message: fmt.Sprintf("VPS %d %s", id, pastTense),
+			})
 		},
 	}
 	f := cmd.Flags()

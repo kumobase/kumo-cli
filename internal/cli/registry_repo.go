@@ -220,15 +220,16 @@ func newRegistryRepoDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Registry().Repos(org).Delete(cmd.Context(), name); err != nil {
 				return mapRegistryRepoError(err, name)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Repo %s/%s deleted\n", org, name)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "registry-repo", Action: "delete", Status: "done",
+				Message: fmt.Sprintf("Repo %s/%s deleted", org, name),
+			})
 		},
 	}
 	f := cmd.Flags()

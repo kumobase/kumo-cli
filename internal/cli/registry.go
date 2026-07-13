@@ -231,8 +231,7 @@ func newRegistryOrgDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Registry().Orgs().Delete(cmd.Context(), slug); err != nil {
@@ -244,8 +243,10 @@ func newRegistryOrgDeleteCmd() *cobra.Command {
 				}
 				return mapRegistryError(err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Org %q deleted\n", slug)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "registry-org", Action: "delete", Status: "done",
+				Message: fmt.Sprintf("Org %q deleted", slug),
+			})
 		},
 	}
 	return cmd

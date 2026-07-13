@@ -88,6 +88,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newRunnersCmd())
 	root.AddCommand(newSourceCmd())
 	root.AddCommand(newJobsCmd())
+	root.AddCommand(newIntrospectCmd())
 	return root
 }
 

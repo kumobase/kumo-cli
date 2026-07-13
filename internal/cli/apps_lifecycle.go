@@ -9,6 +9,8 @@ import (
 	"github.com/kumobase/kumo-go/client"
 	"github.com/kumobase/kumo-go/codes"
 	"github.com/kumobase/kumo-go/types"
+
+	"github.com/kumobase/kumo-cli/internal/output"
 )
 
 func newAppsStartCmd() *cobra.Command {
@@ -61,8 +63,10 @@ func newAppsStopCmd() *cobra.Command {
 			since := time.Now()
 			if err := c.Apps().Stop(cmd.Context(), id); err != nil {
 				if client.IsCode(err, codes.AppAlreadyStopped) {
-					fmt.Fprintf(cmd.OutOrStdout(), "App %d is already stopped\n", id)
-					return nil
+					return printResult(cmd, output.ActionResult{
+						Resource: "app", ID: id, Action: "stop", Status: "noop",
+						Message: fmt.Sprintf("App %d is already stopped", id),
+					})
 				}
 				return err
 			}
@@ -77,14 +81,23 @@ func newAppsStopCmd() *cobra.Command {
 // until the corresponding operation completes.
 func finishLifecycle(cmd *cobra.Command, c *client.Client, id uint, action types.AppOperationActionType, pastTense string, since time.Time, wait bool, timeout time.Duration) error {
 	if !wait {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s queued for app %d\n", capitalize(string(action)), id)
-		return nil
+		return printResult(cmd, output.ActionResult{
+			Resource: "app", ID: id, Action: string(action), Status: "queued",
+			Message: fmt.Sprintf("%s queued for app %d", capitalize(string(action)), id),
+		})
 	}
-	if _, err := waitForOperation(cmd.Context(), c, id, action, since, timeout); err != nil {
+	op, err := waitForOperation(cmd.Context(), c, id, action, since, timeout)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "App %d %s\n", id, pastTense)
-	return nil
+	res := output.ActionResult{
+		Resource: "app", ID: id, Action: string(action), Status: "done",
+		Message: fmt.Sprintf("App %d %s", id, pastTense),
+	}
+	if op != nil {
+		res.OperationID = op.OperationID
+	}
+	return printResult(cmd, res)
 }
 
 func addWaitFlags(cmd *cobra.Command, wait *bool, timeout *time.Duration, defaultWait bool) {

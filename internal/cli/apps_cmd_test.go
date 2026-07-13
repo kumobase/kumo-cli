@@ -738,7 +738,7 @@ func TestAppsDomainAddGetVerifyRemove(t *testing.T) {
 		t.Errorf("unexpected domain verify output: %q", out)
 	}
 
-	if out, _, err = runCLI("apps", "domain", "remove", "42"); err != nil {
+	if out, _, err = runCLI("apps", "domain", "remove", "42", "-y"); err != nil {
 		t.Fatalf("domain remove: %v", err)
 	} else if !strings.Contains(out, "detached") {
 		t.Errorf("unexpected domain remove output: %q", out)

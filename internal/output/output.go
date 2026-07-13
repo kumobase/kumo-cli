@@ -87,7 +87,7 @@ type ActionResult struct {
 	ID          uint   `json:"id,omitempty"`
 	Action      string `json:"action"`
 	Status      string `json:"status"`
-	OperationID *uint  `json:"operation_id,omitempty"`
+	OperationID string `json:"operation_id,omitempty"`
 	Message     string `json:"-"`
 }
 

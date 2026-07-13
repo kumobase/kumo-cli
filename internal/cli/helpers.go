@@ -11,10 +11,25 @@ import (
 	"github.com/kumobase/kumo-cli/internal/output"
 )
 
-// printAborted renders a declined-confirmation result to the command's stdout
-// in the given format and returns nil (an abort is a user choice, exit 0).
-func printAborted(cmd *cobra.Command, format string) error {
-	return output.PrintAborted(cmd.OutOrStdout(), format)
+// outputFormat returns the output format resolved once by the root
+// PersistentPreRunE, falling back to table when unset (e.g. very early errors).
+func outputFormat() string {
+	if resolvedOK {
+		return resolved.Output
+	}
+	return output.FormatTable
+}
+
+// printResult renders a mutation/lifecycle outcome to the command's stdout in
+// the resolved format (JSON success envelope or human line), honouring --quiet.
+func printResult(cmd *cobra.Command, r output.ActionResult) error {
+	return output.PrintResult(cmd.OutOrStdout(), outputFormat(), flagQuiet, r)
+}
+
+// printAborted renders a declined-confirmation result and returns nil (an abort
+// is a user choice, exit 0).
+func printAborted(cmd *cobra.Command) error {
+	return output.PrintAborted(cmd.OutOrStdout(), outputFormat())
 }
 
 // validateSortOrder rejects a --sort-order value that is not asc or desc. An

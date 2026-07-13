@@ -200,7 +200,7 @@ func TestVolumeDetach(t *testing.T) {
 	srv := newServer(t, mux)
 	mockEnv(t, srv.URL)
 
-	out, _, err := runCLI("volume", "detach", "data")
+	out, _, err := runCLI("volume", "detach", "data", "-y")
 	if err != nil {
 		t.Fatalf("volume detach: %v", err)
 	}

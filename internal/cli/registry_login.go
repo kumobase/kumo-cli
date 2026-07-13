@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/kumobase/kumo-cli/internal/output"
 )
 
 const defaultRegistryHost = "registry.kumo.run"
@@ -50,8 +52,10 @@ func newRegistryLoginCmd() *cobra.Command {
 			if err := dockerCmd.Run(); err != nil {
 				return fmt.Errorf("docker login failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Logged in to %s as %s.\n", h, profile.Email)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "registry-login", Action: "login", Status: "done",
+				Message: fmt.Sprintf("Logged in to %s as %s.", h, profile.Email),
+			})
 		},
 	}
 	cmd.Flags().StringVar(&host, "registry-host", "", "registry host (default registry.kumo.run, env KUMO_REGISTRY_HOST)")
@@ -77,8 +81,10 @@ func newRegistryLogoutCmd() *cobra.Command {
 			if err := dockerCmd.Run(); err != nil {
 				return fmt.Errorf("docker logout failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Logged out of %s.\n", h)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "registry-login", Action: "logout", Status: "done",
+				Message: fmt.Sprintf("Logged out of %s.", h),
+			})
 		},
 	}
 	cmd.Flags().StringVar(&host, "registry-host", "", "registry host (default registry.kumo.run, env KUMO_REGISTRY_HOST)")

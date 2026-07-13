@@ -77,9 +77,11 @@ func newAuthLoginCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Logged in as %s <%s> (profile %q)\n",
-				profileData.FullName, profileData.Email, profile)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "auth", Action: "login", Status: "done",
+				Message: fmt.Sprintf("Logged in as %s <%s> (profile %q)",
+					profileData.FullName, profileData.Email, profile),
+			})
 		},
 	}
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key (kumo_sk_...); if omitted, read from stdin or prompt")
@@ -98,15 +100,19 @@ func newAuthLogoutCmd() *cobra.Command {
 			}
 			profile := resolveProfileName(store)
 			if _, ok := store.Credential(profile); !ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "No credentials stored for profile %q\n", profile)
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "auth", Action: "logout", Status: "noop",
+					Message: fmt.Sprintf("No credentials stored for profile %q", profile),
+				})
 			}
 			store.RemoveCredential(profile)
 			if err := store.Save(); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Logged out of profile %q\n", profile)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "auth", Action: "logout", Status: "done",
+				Message: fmt.Sprintf("Logged out of profile %q (local credentials removed; the API key is not revoked)", profile),
+			})
 		},
 	}
 }

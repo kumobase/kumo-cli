@@ -157,8 +157,7 @@ func newVolumeDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Volumes().Delete(cmd.Context(), id); err != nil {
@@ -167,8 +166,10 @@ func newVolumeDeleteCmd() *cobra.Command {
 				}
 				return mapVolumeBusyError(err, v.Status)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Volume %d deleted\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "volume", ID: id, Action: "delete", Status: "done",
+				Message: fmt.Sprintf("Volume %d deleted", id),
+			})
 		},
 	}
 	return cmd

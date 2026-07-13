@@ -9,6 +9,8 @@ import (
 	"github.com/kumobase/kumo-go/client"
 	"github.com/kumobase/kumo-go/codes"
 	"github.com/kumobase/kumo-go/types"
+
+	"github.com/kumobase/kumo-cli/internal/output"
 )
 
 func newVolumeAttachCmd() *cobra.Command {
@@ -45,8 +47,10 @@ func newVolumeAttachCmd() *cobra.Command {
 			if err != nil {
 				return mapVolumeAttachError(err, v.Status)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Volume %d attached to %s at %s\n", res.ID, appName, mount)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "volume", ID: res.ID, Action: "attach", Status: "done",
+				Message: fmt.Sprintf("Volume %d attached to %s at %s", res.ID, appName, mount),
+			})
 		},
 	}
 	f := cmd.Flags()
@@ -80,11 +84,22 @@ func newVolumeDetachCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if !flagYes {
+				ok, err := confirm(cmd, fmt.Sprintf("Detach volume %q from its app? The app loses access to its data.", v.Name))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return printAborted(cmd)
+				}
+			}
 			if _, err := c.Volumes().Detach(cmd.Context(), id); err != nil {
 				return mapVolumeBusyError(err, v.Status)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Volume %d detached\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "volume", ID: id, Action: "detach", Status: "done",
+				Message: fmt.Sprintf("Volume %d detached", id),
+			})
 		},
 	}
 	return cmd
@@ -124,14 +139,18 @@ func newVolumeResizeCmd() *cobra.Command {
 				if err != nil {
 					return mapVolumeResizeError(err, v.Status, v.Name)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Volume %d resized to %d GB (status %s)\n", res.ID, res.SizeGB, res.Status)
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "volume", ID: res.ID, Action: "resize", Status: string(res.Status),
+					Message: fmt.Sprintf("Volume %d resized to %d GB (status %s)", res.ID, res.SizeGB, res.Status),
+				})
 			}
 			if _, err := c.Volumes().Resize(cmd.Context(), id, req); err != nil {
 				return mapVolumeResizeError(err, v.Status, v.Name)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Resize queued for volume %d; run `kumo volume get %s` to poll progress\n", id, v.Name)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "volume", ID: id, Action: "resize", Status: "queued",
+				Message: fmt.Sprintf("Resize queued for volume %d; run `kumo volume get %s` to poll progress", id, v.Name),
+			})
 		},
 	}
 	f := cmd.Flags()

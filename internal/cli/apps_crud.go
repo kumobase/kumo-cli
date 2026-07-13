@@ -198,7 +198,9 @@ func newAppsCreateCmd() *cobra.Command {
 				})
 			}
 
-			fmt.Fprintf(cmd.ErrOrStderr(), "Deploying %q…\n", req.Name)
+			if !flagQuiet {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Deploying %q…\n", req.Name)
+			}
 			app, err := c.Apps().CreateAndWait(cmd.Context(), req, pollOpts(timeout)...)
 			if err != nil {
 				return err
@@ -377,10 +379,14 @@ func newAppsUpdateCmd() *cobra.Command {
 			}
 
 			if !wait {
-				fmt.Fprintf(cmd.OutOrStdout(), "Update queued for app %d\n", id)
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "app", ID: id, Action: "update", Status: "queued",
+					Message: fmt.Sprintf("Update queued for app %d", id),
+				})
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "Updating app %d…\n", id)
+			if !flagQuiet {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Updating app %d…\n", id)
+			}
 			if _, err := waitForOperation(cmd.Context(), c, id, types.AppOperationActionUpdate, since, timeout); err != nil {
 				return err
 			}
@@ -557,23 +563,28 @@ func newAppsDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if err := c.Apps().Delete(cmd.Context(), id); err != nil {
 				return err
 			}
 			if !wait {
-				fmt.Fprintf(cmd.OutOrStdout(), "Deletion queued for app %d\n", id)
-				return nil
+				return printResult(cmd, output.ActionResult{
+					Resource: "app", ID: id, Action: "delete", Status: "queued",
+					Message: fmt.Sprintf("Deletion queued for app %d", id),
+				})
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "Deleting app %d…\n", id)
+			if !flagQuiet {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Deleting app %d…\n", id)
+			}
 			if err := waitForDeletion(cmd, c, id, timeout); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "App %d deleted\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "app", ID: id, Action: "delete", Status: "done",
+				Message: fmt.Sprintf("App %d deleted", id),
+			})
 		},
 	}
 	f := cmd.Flags()

@@ -245,15 +245,16 @@ func newJobsDeleteCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd)
 				}
 			}
 			if _, err := c.Jobs().Delete(cmd.Context(), id); err != nil {
 				return mapJobError(err, args[0])
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deletion queued for job %d\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "job", ID: id, Action: "delete", Status: "queued",
+				Message: fmt.Sprintf("Deletion queued for job %d", id),
+			})
 		},
 	}
 	return cmd

@@ -85,11 +85,22 @@ func newAppsDomainRemoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.Apps().DeleteCustomDomain(cmd.Context(), id); err != nil {
+			if !flagYes {
+				ok, err := confirm(cmd, fmt.Sprintf("Detach the custom domain from app %d? Public traffic on it will stop.", id))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return printAborted(cmd)
+				}
+			}
+			if err := c.Apps().DeleteCustomDomain(cmd.Context(), id, writeOpts("")...); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Custom domain detached from app %d\n", id)
-			return nil
+			return printResult(cmd, output.ActionResult{
+				Resource: "app", ID: id, Action: "domain-remove", Status: "done",
+				Message: fmt.Sprintf("Custom domain detached from app %d", id),
+			})
 		},
 	}
 }
