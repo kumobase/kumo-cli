@@ -1,16 +1,31 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
-    - gofmt
     - govet
     - ineffassign
-    - typecheck
     - unused
+  settings:
+    errcheck:
+      # Writes to stdout/stderr and tabwriter buffers are conventionally
+      # left unchecked in a CLI; excluding them keeps errcheck focused on
+      # errors that actually matter.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*text/tabwriter.Writer).Write
+        - (*text/tabwriter.Writer).Flush
+
+formatters:
+  enable:
+    - gofmt
 
 issues:
   max-same-issues: 0
