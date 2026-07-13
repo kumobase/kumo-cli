@@ -60,11 +60,11 @@ func newAppsListCmd() *cobra.Command {
 			if sortCol != "" {
 				opts = append(opts, client.WithSort(sortCol, sortDir))
 			}
-			apps, _, err := c.Apps().List(cmd.Context(), opts...)
+			apps, meta, err := c.Apps().List(cmd.Context(), opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, apps, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, apps, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tREPLICAS\tEXPOSED\tSUBDOMAIN\tCREATED")
 				for _, a := range apps {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%d/%d\t%t\t%s\t%s\n",

@@ -53,7 +53,7 @@ func TestVPSListJSON(t *testing.T) {
 		t.Fatalf("vps list json: %v", err)
 	}
 	var got []map[string]any
-	decodeData(t, out, &got)
+	decodeItems(t, out, &got)
 	if len(got) != 1 || got[0]["display_name"] != "web1" {
 		t.Errorf("unexpected json: %s", out)
 	}

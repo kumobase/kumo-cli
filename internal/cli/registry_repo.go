@@ -60,11 +60,11 @@ func newRegistryRepoListCmd() *cobra.Command {
 			if sortCol != "" {
 				opts = append(opts, client.WithSort(sortCol, sortDir))
 			}
-			repos, _, err := c.Registry().Repos(org).List(cmd.Context(), opts...)
+			repos, meta, err := c.Registry().Repos(org).List(cmd.Context(), opts...)
 			if err != nil {
 				return mapRegistryError(err)
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, repos, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, repos, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "NAME\tTAG MUTABILITY\tCREATED")
 				for _, r := range repos {
 					fmt.Fprintf(tw, "%s\t%s\t%s\n",

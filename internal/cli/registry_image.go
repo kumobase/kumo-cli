@@ -62,11 +62,11 @@ func newRegistryImageListCmd() *cobra.Command {
 			if sortCol != "" {
 				opts = append(opts, client.WithSort(sortCol, sortDir))
 			}
-			ms, _, err := c.Registry().Repos(org).ListManifests(cmd.Context(), args[0], opts...)
+			ms, meta, err := c.Registry().Repos(org).ListManifests(cmd.Context(), args[0], opts...)
 			if err != nil {
 				return mapRegistryRepoError(err, args[0])
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, ms, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, ms, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "TAG\tDIGEST\tSIZE\tARCH/OS\tPUSHED")
 				for _, m := range ms {
 					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",

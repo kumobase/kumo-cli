@@ -22,8 +22,29 @@ func newBillingCmd() *cobra.Command {
 			"This is a read-only surface. Top-ups and voucher redemption are done in the\n" +
 			"Kumo dashboard.",
 	}
-	cmd.AddCommand(newBillingSummaryCmd(), newBillingChargesCmd(), newBillingBreakdownCmd())
+	cmd.AddCommand(newBillingBalanceCmd(), newBillingSummaryCmd(), newBillingChargesCmd(), newBillingBreakdownCmd())
 	return cmd
+}
+
+func newBillingBalanceCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "balance",
+		Short: "Show the current prepaid account balance",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, s, err := newClient()
+			if err != nil {
+				return err
+			}
+			bal, err := c.Profile().GetBalance(cmd.Context())
+			if err != nil {
+				return mapBillingError(err)
+			}
+			return output.Print(cmd.OutOrStdout(), s.Output, bal, func(tw *tabwriter.Writer) {
+				fmt.Fprintf(tw, "Balance:\t%s\n", bal.Balance)
+			})
+		},
+	}
 }
 
 func newBillingSummaryCmd() *cobra.Command {
@@ -47,6 +68,10 @@ func newBillingSummaryCmd() *cobra.Command {
 				fmt.Fprintf(tw, "Charged so far:\t%s\n", cp.TotalCharged)
 				fmt.Fprintf(tw, "Accruing (unbilled):\t%s\n", cp.AccruingTotal)
 				fmt.Fprintf(tw, "Previous period total:\t%s\n", sum.PreviousPeriodTotal)
+				fmt.Fprintln(tw, "\nPRODUCT\tCHARGED\tACCRUING")
+				for _, p := range productBreakdownRows(cp.ByProduct, cp.Accruing) {
+					fmt.Fprintf(tw, "%s\t%s\t%s\n", p.name, p.charged, p.accruing)
+				}
 			})
 		},
 	}
@@ -55,7 +80,7 @@ func newBillingSummaryCmd() *cobra.Command {
 func newBillingChargesCmd() *cobra.Command {
 	var (
 		page, pageSize      int
-		sort                string
+		sort, sortOrder     string
 		from, to            string
 		productType, status string
 		groupBy             string
@@ -66,23 +91,30 @@ func newBillingChargesCmd() *cobra.Command {
 		Short: "List billing charges",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateSortOrder(sortOrder); err != nil {
+				return err
+			}
+			// group_by only changes the response shape under --group; sending it
+			// on the flat endpoint yields silently-empty rows.
+			if groupBy != "" && !grouped {
+				return usageError{err: fmt.Errorf("--group-by requires --group (grouped totals)")}
+			}
 			c, s, err := newClient()
 			if err != nil {
 				return err
 			}
-			opts := billingChargeOpts(page, pageSize, sort, from, to, productType, status, groupBy)
+			opts := billingChargeOpts(page, pageSize, sort, sortOrder, from, to, productType, status, groupBy)
 
 			if grouped {
 				groups, meta, err := c.Billing().ListGroupedCharges(cmd.Context(), opts...)
 				if err != nil {
 					return mapBillingError(err)
 				}
-				return output.Print(cmd.OutOrStdout(), s.Output, groups, func(tw *tabwriter.Writer) {
+				return output.PrintList(cmd.OutOrStdout(), s.Output, groups, meta, func(tw *tabwriter.Writer) {
 					fmt.Fprintln(tw, "GROUP\tTOTAL\tCURRENCY\tCHARGES")
 					for _, g := range groups {
 						fmt.Fprintf(tw, "%s\t%s\t%s\t%d\n", g.GroupKey, g.TotalAmount, g.Currency, g.ChargeCount)
 					}
-					printPageFooter(tw, meta)
 				})
 			}
 
@@ -90,7 +122,7 @@ func newBillingChargesCmd() *cobra.Command {
 			if err != nil {
 				return mapBillingError(err)
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, charges, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, charges, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tPRODUCT\tPLAN\tAMOUNT\tCURRENCY\tTYPE\tSTATUS\tPERIOD")
 				for _, ch := range charges {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s → %s\n",
@@ -98,7 +130,6 @@ func newBillingChargesCmd() *cobra.Command {
 						ch.ChargeType, ch.Status,
 						ch.PeriodStart.Format("2006-01-02"), ch.PeriodEnd.Format("2006-01-02"))
 				}
-				printPageFooter(tw, meta)
 			})
 		},
 	}
@@ -106,6 +137,7 @@ func newBillingChargesCmd() *cobra.Command {
 	f.IntVar(&page, "page", 0, "page number (1-based)")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (max 100)")
 	f.StringVar(&sort, "sort", "", "sort column")
+	f.StringVar(&sortOrder, "sort-order", "desc", "sort direction: asc or desc")
 	f.StringVar(&from, "from", "", "start date (YYYY-MM-DD)")
 	f.StringVar(&to, "to", "", "end date (YYYY-MM-DD)")
 	f.StringVar(&productType, "product-type", "", "filter by product type")
@@ -142,7 +174,28 @@ func newBillingBreakdownCmd() *cobra.Command {
 				fmt.Fprintf(tw, "Currency:\t%s\n", bd.Currency)
 				fmt.Fprintf(tw, "Range:\t%s → %s (%s, by %s)\n", bd.From, bd.To, bd.Granularity, bd.GroupBy)
 				fmt.Fprintf(tw, "Total:\t%s\n", bd.Totals.Amount)
-				fmt.Fprintln(tw, "PERIOD\tAMOUNT")
+				grouped := bd.GroupBy != "" && bd.GroupBy != types.BreakdownGroupByNone
+				if grouped {
+					fmt.Fprintln(tw, "\nPERIOD\tGROUP\tAMOUNT")
+					for _, b := range bd.Buckets {
+						period := b.PeriodStart.Format("2006-01-02")
+						if len(b.Groups) == 0 {
+							fmt.Fprintf(tw, "%s\t%s\t%s\n", period, "-", b.Amount)
+							continue
+						}
+						for _, g := range b.Groups {
+							fmt.Fprintf(tw, "%s\t%s\t%s\n", period, g.Key, g.Amount)
+						}
+					}
+					if len(bd.Totals.Groups) > 0 {
+						fmt.Fprintln(tw, "\nGROUP TOTAL\tAMOUNT")
+						for _, g := range bd.Totals.Groups {
+							fmt.Fprintf(tw, "%s\t%s\n", g.Key, g.Amount)
+						}
+					}
+					return
+				}
+				fmt.Fprintln(tw, "\nPERIOD\tAMOUNT")
 				for _, b := range bd.Buckets {
 					fmt.Fprintf(tw, "%s\t%s\n", b.PeriodStart.Format("2006-01-02"), b.Amount)
 				}
@@ -158,7 +211,7 @@ func newBillingBreakdownCmd() *cobra.Command {
 }
 
 // billingChargeOpts builds the shared list options for the charges endpoints.
-func billingChargeOpts(page, pageSize int, sort, from, to, productType, status, groupBy string) []client.ListOption {
+func billingChargeOpts(page, pageSize int, sort, sortOrder, from, to, productType, status, groupBy string) []client.ListOption {
 	var opts []client.ListOption
 	if page > 0 {
 		opts = append(opts, client.WithPage(page))
@@ -167,7 +220,7 @@ func billingChargeOpts(page, pageSize int, sort, from, to, productType, status, 
 		opts = append(opts, client.WithPageSize(pageSize))
 	}
 	if sort != "" {
-		opts = append(opts, client.WithSort(sort, "desc"))
+		opts = append(opts, client.WithSort(sort, sortOrder))
 	}
 	for _, kv := range [][2]string{
 		{"from", from}, {"to", to}, {"product_type", productType},
@@ -178,6 +231,22 @@ func billingChargeOpts(page, pageSize int, sort, from, to, productType, status, 
 		}
 	}
 	return opts
+}
+
+type productRow struct{ name, charged, accruing string }
+
+// productBreakdownRows pairs the settled (charged) and accruing per-product
+// amounts into stable, ordered rows for the summary table.
+func productBreakdownRows(charged, accruing types.ProductBreakdown) []productRow {
+	return []productRow{
+		{"app", charged.App, accruing.App},
+		{"vps", charged.VPS, accruing.VPS},
+		{"storage", charged.Storage, accruing.Storage},
+		{"container_registry", charged.ContainerRegistry, accruing.ContainerRegistry},
+		{"database", charged.Database, accruing.Database},
+		{"jobs", charged.Jobs, accruing.Jobs},
+		{"vm_runners", charged.VMRunners, accruing.VMRunners},
+	}
 }
 
 // mapBillingError translates billing read-endpoint error codes into friendly

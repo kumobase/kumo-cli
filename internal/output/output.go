@@ -140,6 +140,17 @@ func writePageFooter(tw *tabwriter.Writer, meta *types.Meta) {
 	}
 }
 
+// PrintAborted reports a user-declined confirmation. In JSON it emits an
+// {"ok":false,"error":{"code":"ABORTED"}} envelope; in table mode a short line.
+// The caller returns nil (exit 0) — an abort is a user choice, not a failure.
+func PrintAborted(w io.Writer, format string) error {
+	if format == FormatJSON {
+		return encodeJSON(w, Envelope{OK: false, Error: &APIErrorView{Code: "ABORTED", Message: "aborted by user"}})
+	}
+	_, err := fmt.Fprintln(w, "Aborted.")
+	return err
+}
+
 // ErrorView unwraps err into the stable JSON error shape.
 func ErrorView(err error) APIErrorView {
 	var apiErr *client.APIError

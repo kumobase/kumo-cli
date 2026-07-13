@@ -45,6 +45,7 @@ func newVPSCmd() *cobra.Command {
 func newVPSListCmd() *cobra.Command {
 	var (
 		status, region, provider string
+		expiresBefore            string
 		page, pageSize           int
 	)
 	cmd := &cobra.Command{
@@ -52,6 +53,9 @@ func newVPSListCmd() *cobra.Command {
 		Short: "List VPS instances",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateRFC3339Flag("expires-before", expiresBefore); err != nil {
+				return err
+			}
 			c, s, err := newClient()
 			if err != nil {
 				return err
@@ -72,11 +76,14 @@ func newVPSListCmd() *cobra.Command {
 			if provider != "" {
 				opts = append(opts, client.WithExtraQuery("provider_name", provider))
 			}
-			servers, _, err := c.VPS().ListServers(cmd.Context(), opts...)
+			if expiresBefore != "" {
+				opts = append(opts, client.WithExtraQuery("expires_before", expiresBefore))
+			}
+			servers, meta, err := c.VPS().ListServers(cmd.Context(), opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, servers, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, servers, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tPROVIDER\tREGION\tIP\tEXPIRES")
 				for _, v := range servers {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -91,6 +98,7 @@ func newVPSListCmd() *cobra.Command {
 	f.StringVar(&status, "status", "", "filter by status (provisioning, running, stopped, expired)")
 	f.StringVar(&region, "region", "", "filter by region id")
 	f.StringVar(&provider, "provider", "", "filter by provider name")
+	f.StringVar(&expiresBefore, "expires-before", "", "only servers expiring at/before this RFC3339 time")
 	f.IntVar(&page, "page", 0, "page number (1-based)")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (max 100)")
 	return cmd
@@ -144,6 +152,7 @@ func newVPSRegionsCmd() *cobra.Command {
 func newVPSPlansCmd() *cobra.Command {
 	var (
 		region, provider, sort string
+		sortOrder              string
 	)
 	cmd := &cobra.Command{
 		Use:   "plans",
@@ -151,7 +160,10 @@ func newVPSPlansCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if region == "" {
-				return fmt.Errorf("--region is required")
+				return usageError{err: fmt.Errorf("--region is required")}
+			}
+			if err := validateSortOrder(sortOrder); err != nil {
+				return err
 			}
 			c, s, err := newClient()
 			if err != nil {
@@ -162,7 +174,7 @@ func newVPSPlansCmd() *cobra.Command {
 				opts = append(opts, client.WithExtraQuery("provider_name", provider))
 			}
 			if sort != "" {
-				opts = append(opts, client.WithSort(sort, "asc"))
+				opts = append(opts, client.WithSort(sort, sortOrder))
 			}
 			plans, err := c.VPS().ListPlans(cmd.Context(), opts...)
 			if err != nil {
@@ -182,6 +194,7 @@ func newVPSPlansCmd() *cobra.Command {
 	f.StringVar(&region, "region", "", "region id (required)")
 	f.StringVar(&provider, "provider", "", "filter by provider name")
 	f.StringVar(&sort, "sort", "", "sort column")
+	f.StringVar(&sortOrder, "sort-order", "asc", "sort direction: asc or desc")
 	return cmd
 }
 

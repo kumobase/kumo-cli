@@ -30,6 +30,19 @@ func decodeData(t *testing.T, out string, v any) {
 	}
 }
 
+// decodeItems unwraps the "items" array of a -o json list envelope
+// ({"ok":true,"data":{"items":[…],"meta":…}}) into v.
+func decodeItems(t *testing.T, out string, v any) {
+	t.Helper()
+	var wrap struct {
+		Items json.RawMessage `json:"items"`
+	}
+	decodeData(t, out, &wrap)
+	if err := json.Unmarshal(wrap.Items, v); err != nil {
+		t.Fatalf("decode items: %v (items=%s)", err, wrap.Items)
+	}
+}
+
 // runCLI builds a fresh root command, runs it with the given args, and
 // returns captured stdout, stderr, and the execution error.
 //

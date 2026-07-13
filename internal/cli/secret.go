@@ -98,11 +98,11 @@ func newSecretListCmd() *cobra.Command {
 			if sortCol != "" {
 				opts = append(opts, client.WithSort(sortCol, sortDir))
 			}
-			secrets, _, err := c.Secrets().List(cmd.Context(), opts...)
+			secrets, meta, err := c.Secrets().List(cmd.Context(), opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, secrets, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, secrets, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tTYPE\tUSED BY\tCREATED")
 				for _, sec := range secrets {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n",

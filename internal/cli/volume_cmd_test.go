@@ -51,7 +51,7 @@ func TestVolumeListJSON(t *testing.T) {
 		t.Fatalf("volume list json: %v", err)
 	}
 	var got []map[string]any
-	decodeData(t, out, &got)
+	decodeItems(t, out, &got)
 	if len(got) != 1 || got[0]["name"] != "data" {
 		t.Errorf("unexpected json: %s", out)
 	}

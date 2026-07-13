@@ -40,12 +40,22 @@ func newJobsListCmd() *cobra.Command {
 	var (
 		page, pageSize int
 		sortCol        string
+		sortOrder      string
+		kind           string
+		appRef         string
+		suspended      bool
 	)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List jobs",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateSortOrder(sortOrder); err != nil {
+				return err
+			}
+			if kind != "" && kind != "standalone" && kind != "app_attached" {
+				return usageError{err: fmt.Errorf("invalid --kind %q (use standalone or app_attached)", kind)}
+			}
 			c, s, err := newClient()
 			if err != nil {
 				return err
@@ -58,20 +68,32 @@ func newJobsListCmd() *cobra.Command {
 				opts = append(opts, client.WithPageSize(pageSize))
 			}
 			if sortCol != "" {
-				opts = append(opts, client.WithSort(sortCol, "desc"))
+				opts = append(opts, client.WithSort(sortCol, sortOrder))
+			}
+			if kind != "" {
+				opts = append(opts, client.WithExtraQuery("kind", kind))
+			}
+			if appRef != "" {
+				appID, _, _, err := resolveAppRef(cmd.Context(), c, appRef)
+				if err != nil {
+					return err
+				}
+				opts = append(opts, client.WithExtraQuery("app_id", fmt.Sprintf("%d", appID)))
+			}
+			if cmd.Flags().Changed("suspended") {
+				opts = append(opts, client.WithExtraQuery("suspended", fmt.Sprintf("%t", suspended)))
 			}
 			jobs, meta, err := c.Jobs().List(cmd.Context(), opts...)
 			if err != nil {
 				return mapJobError(err, "")
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, jobs, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, jobs, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tKIND\tSCHEDULE\tSUSPENDED\tDEPLOYMENT\tLAST RUN")
 				for _, j := range jobs {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%t\t%s\t%s\n",
 						j.ID, j.Name, j.Kind, jobSchedule(j.Schedule), j.Suspended,
 						j.DeploymentStatus, formatOptionalTime(j.LastExecutionAt, "never"))
 				}
-				printPageFooter(tw, meta)
 			})
 		},
 	}
@@ -79,6 +101,10 @@ func newJobsListCmd() *cobra.Command {
 	f.IntVar(&page, "page", 0, "page number (1-based)")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (max 100)")
 	f.StringVar(&sortCol, "sort", "", "sort column")
+	f.StringVar(&sortOrder, "sort-order", "desc", "sort direction: asc or desc")
+	f.StringVar(&kind, "kind", "", "filter by kind: standalone or app_attached")
+	f.StringVar(&appRef, "app", "", "filter to jobs attached to this app (name)")
+	f.BoolVar(&suspended, "suspended", false, "filter by suspended state (only applied when set)")
 	return cmd
 }
 

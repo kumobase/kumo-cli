@@ -43,12 +43,17 @@ func newSourceListCmd() *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), s.Output, conns, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tPROVIDER\tACCOUNT\tKIND\tSTATUS\tREPOS")
 				for _, cn := range conns {
-					repos := orDash(cn.RepoSelection)
-					if cn.RepoSelection == "selected" {
+					account, repos := cn.AccountLogin, orDash(cn.RepoSelection)
+					switch {
+					case cn.GitLab != nil:
+						// GitLab rows don't populate the GitHub-centric fields.
+						account = cn.GitLab.NamespacePath
+						repos = string(cn.GitLab.Kind)
+					case cn.RepoSelection == "selected":
 						repos = fmt.Sprintf("selected (%d)", cn.RepoCount)
 					}
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\n",
-						cn.ID, cn.Provider, cn.AccountLogin, cn.AppKind, cn.Status, repos)
+						cn.ID, cn.Provider, account, cn.AppKind, cn.Status, repos)
 				}
 			})
 		},
@@ -56,7 +61,10 @@ func newSourceListCmd() *cobra.Command {
 }
 
 func newSourceReposCmd() *cobra.Command {
-	var page, pageSize int
+	var (
+		page, pageSize int
+		filter         string
+	)
 	cmd := &cobra.Command{
 		Use:   "repos <id>",
 		Short: "List repositories a source connection can access",
@@ -77,22 +85,25 @@ func newSourceReposCmd() *cobra.Command {
 			if pageSize > 0 {
 				opts = append(opts, client.WithPageSize(pageSize))
 			}
+			if filter != "" {
+				opts = append(opts, client.WithExtraQuery("q", filter))
+			}
 			repos, meta, err := c.SourceConnections().ListRepos(cmd.Context(), id, opts...)
 			if err != nil {
 				return mapSourceError(err, id)
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, repos, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, repos, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "REPO\tPRIVATE\tDEFAULT BRANCH")
 				for _, r := range repos {
 					fmt.Fprintf(tw, "%s\t%t\t%s\n", r.FullName, r.Private, r.DefaultBranch)
 				}
-				printPageFooter(tw, meta)
 			})
 		},
 	}
 	f := cmd.Flags()
 	f.IntVar(&page, "page", 0, "page number (1-based)")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (max 100)")
+	f.StringVar(&filter, "filter", "", "case-insensitive substring filter on repository full name")
 	return cmd
 }
 
@@ -106,7 +117,7 @@ func newSourceDisconnectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			c, _, err := newClient()
+			c, s, err := newClient()
 			if err != nil {
 				return err
 			}
@@ -116,15 +127,16 @@ func newSourceDisconnectCmd() *cobra.Command {
 					return err
 				}
 				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+					return printAborted(cmd, s.Output)
 				}
 			}
 			if _, err := c.SourceConnections().Disconnect(cmd.Context(), id); err != nil {
 				return mapSourceError(err, id)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Source connection %d disconnected\n", id)
-			return nil
+			return output.PrintResult(cmd.OutOrStdout(), s.Output, flagQuiet, output.ActionResult{
+				Resource: "source-connection", ID: id, Action: "disconnect", Status: "done",
+				Message: fmt.Sprintf("Source connection %d disconnected", id),
+			})
 		},
 	}
 	return cmd

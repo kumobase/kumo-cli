@@ -37,19 +37,22 @@ func newRegistryCmd() *cobra.Command {
 // newRegistryPlansCmd lists the public container-registry billing catalogue.
 // No org is required — the catalogue is a public price list.
 func newRegistryPlansCmd() *cobra.Command {
-	var sort string
+	var sort, sortOrder string
 	cmd := &cobra.Command{
 		Use:   "plans",
 		Short: "List container-registry billing plans",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateSortOrder(sortOrder); err != nil {
+				return err
+			}
 			c, s, err := newClient()
 			if err != nil {
 				return err
 			}
 			var opts []client.ListOption
 			if sort != "" {
-				opts = append(opts, client.WithSort(sort, "asc"))
+				opts = append(opts, client.WithSort(sort, sortOrder))
 			}
 			plans, err := c.Registry().ListPlans(cmd.Context(), opts...)
 			if err != nil {
@@ -65,6 +68,7 @@ func newRegistryPlansCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&sort, "sort", "", "sort column")
+	cmd.Flags().StringVar(&sortOrder, "sort-order", "asc", "sort direction: asc or desc")
 	return cmd
 }
 
@@ -98,7 +102,7 @@ func newRegistryOrgListCmd() *cobra.Command {
 			if err != nil {
 				return mapRegistryError(err)
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, orgs, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, orgs, nil, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "SLUG\tDISPLAY NAME\tDEFAULT\tAUTO-CREATE REPOS\tSUSPENDED\tCREATED")
 				for _, o := range orgs {
 					fmt.Fprintf(tw, "%s\t%s\t%t\t%t\t%s\t%s\n",

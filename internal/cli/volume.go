@@ -42,12 +42,16 @@ func newVolumePlansCmd() *cobra.Command {
 	var (
 		page, pageSize int
 		sort           string
+		sortOrder      string
 	)
 	cmd := &cobra.Command{
 		Use:   "plans",
 		Short: "List available storage tiers (volume plans)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateSortOrder(sortOrder); err != nil {
+				return err
+			}
 			c, s, err := newClient()
 			if err != nil {
 				return err
@@ -60,21 +64,17 @@ func newVolumePlansCmd() *cobra.Command {
 				opts = append(opts, client.WithPageSize(pageSize))
 			}
 			if sort != "" {
-				opts = append(opts, client.WithSort(sort, "asc"))
+				opts = append(opts, client.WithSort(sort, sortOrder))
 			}
 			plans, meta, err := c.Volumes().ListPlans(cmd.Context(), opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, plans, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, plans, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "SLUG\tNAME\tMIN GB\tMAX GB\tPRICE/GB-HR")
 				for _, p := range plans {
 					fmt.Fprintf(tw, "%s\t%s\t%d\t%d\t%s\n",
 						p.Slug, p.Name, p.MinSizeGB, p.MaxSizeGB, p.PricePerGBHour)
-				}
-				if meta != nil && meta.TotalPages > 1 {
-					fmt.Fprintf(tw, "\nPage %d/%d (%d items) — use --page to see more\n",
-						meta.Page, meta.TotalPages, meta.TotalItems)
 				}
 			})
 		},
@@ -83,6 +83,7 @@ func newVolumePlansCmd() *cobra.Command {
 	f.IntVar(&page, "page", 0, "page number (1-based)")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (max 100)")
 	f.StringVar(&sort, "sort", "", "sort column")
+	f.StringVar(&sortOrder, "sort-order", "asc", "sort direction: asc or desc")
 	return cmd
 }
 
@@ -126,11 +127,11 @@ func newVolumeListCmd() *cobra.Command {
 				}
 				opts = append(opts, client.WithExtraQuery("app_id", fmt.Sprintf("%d", id)))
 			}
-			vols, _, err := c.Volumes().List(cmd.Context(), opts...)
+			vols, meta, err := c.Volumes().List(cmd.Context(), opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, vols, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, vols, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tTIER\tSIZE\tSTATUS\tAPP\tMOUNT\tCREATED")
 				for _, v := range vols {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%d GB\t%s\t%s\t%s\t%s\n",

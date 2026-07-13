@@ -56,7 +56,7 @@ func TestAPIKeyListJSON(t *testing.T) {
 		t.Fatalf("apikey list json: %v", err)
 	}
 	var got []map[string]any
-	decodeData(t, out, &got)
+	decodeItems(t, out, &got)
 	if len(got) != 1 || got[0]["name"] != "laptop" {
 		t.Errorf("unexpected json: %s", out)
 	}

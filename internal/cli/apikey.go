@@ -49,7 +49,7 @@ func newAPIKeyListCmd() *cobra.Command {
 			if err != nil {
 				return mapAPIKeySessionError(err)
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, keys, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, keys, nil, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "ID\tNAME\tKIND\tPREFIX\tSCOPES\tEXPIRES\tLAST USED")
 				for _, k := range keys {
 					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",

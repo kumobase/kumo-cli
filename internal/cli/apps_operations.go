@@ -48,11 +48,11 @@ func newAppsOperationsCmd() *cobra.Command {
 			if pageSize > 0 {
 				opts = append(opts, client.WithPageSize(pageSize))
 			}
-			ops, _, err := c.Apps().ListOperations(cmd.Context(), id, opts...)
+			ops, meta, err := c.Apps().ListOperations(cmd.Context(), id, opts...)
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), s.Output, ops, func(tw *tabwriter.Writer) {
+			return output.PrintList(cmd.OutOrStdout(), s.Output, ops, meta, func(tw *tabwriter.Writer) {
 				fmt.Fprintln(tw, "OPERATION ID\tACTION\tSTATUS\tQUEUED")
 				for _, op := range ops {
 					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
