@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -54,9 +53,7 @@ func TestVPSListJSON(t *testing.T) {
 		t.Fatalf("vps list json: %v", err)
 	}
 	var got []map[string]any
-	if err := json.NewDecoder(strings.NewReader(out)).Decode(&got); err != nil && err != io.EOF {
-		t.Fatalf("decode: %v", err)
-	}
+	decodeData(t, out, &got)
 	if len(got) != 1 || got[0]["display_name"] != "web1" {
 		t.Errorf("unexpected json: %s", out)
 	}
@@ -235,9 +232,7 @@ func TestVPSPasswordRevealJSON(t *testing.T) {
 		t.Fatalf("vps password json: %v", err)
 	}
 	var got map[string]string
-	if err := json.NewDecoder(strings.NewReader(out)).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	decodeData(t, out, &got)
 	if got["password"] != "s3cr3t-init" {
 		t.Errorf("unexpected json: %s", out)
 	}

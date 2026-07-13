@@ -240,7 +240,7 @@ func newSecretUpdateCmd() *cobra.Command {
 				return err
 			}
 
-			res, err := c.Secrets().Update(cmd.Context(), id, req, client.IfMatch(etag))
+			res, err := c.Secrets().Update(cmd.Context(), id, req, writeOpts(etag)...)
 			if err != nil {
 				if errors.Is(err, client.ErrETagMismatch) {
 					return fmt.Errorf("secret changed since it was read; re-run the update: %w", err)
@@ -322,7 +322,6 @@ func applySecretPayloadOverrides(cmd *cobra.Command, req *types.UpdateSecretRequ
 }
 
 func newSecretDeleteCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a secret",
@@ -336,7 +335,7 @@ func newSecretDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete secret %q (id %d)? This cannot be undone.", sec.Name, id))
 				if err != nil {
 					return err
@@ -356,7 +355,6 @@ func newSecretDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

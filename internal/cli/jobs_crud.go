@@ -226,7 +226,6 @@ func newJobsUpdateCmd() *cobra.Command {
 }
 
 func newJobsDeleteCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a job",
@@ -240,7 +239,7 @@ func newJobsDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete job %q (id %d)? This cannot be undone.", j.Name, id))
 				if err != nil {
 					return err
@@ -257,7 +256,6 @@ func newJobsDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

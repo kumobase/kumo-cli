@@ -13,7 +13,7 @@ import (
 func newVPSStartCmd() *cobra.Command {
 	return newVPSPowerCmd("start", "Power on a VPS instance", "powered on",
 		func(ctx context.Context, c *client.Client, id uint, timeout time.Duration) error {
-			_, err := c.VPS().PowerOnAndWait(ctx, id, client.WithPollMaxWait(timeout))
+			_, err := c.VPS().PowerOnAndWait(ctx, id, pollOpts(timeout)...)
 			return err
 		},
 		func(ctx context.Context, c *client.Client, id uint) error {
@@ -24,7 +24,7 @@ func newVPSStartCmd() *cobra.Command {
 func newVPSStopCmd() *cobra.Command {
 	return newVPSPowerCmd("stop", "Power off a VPS instance", "powered off",
 		func(ctx context.Context, c *client.Client, id uint, timeout time.Duration) error {
-			_, err := c.VPS().PowerOffAndWait(ctx, id, client.WithPollMaxWait(timeout))
+			_, err := c.VPS().PowerOffAndWait(ctx, id, pollOpts(timeout)...)
 			return err
 		},
 		func(ctx context.Context, c *client.Client, id uint) error {
@@ -35,7 +35,7 @@ func newVPSStopCmd() *cobra.Command {
 func newVPSRebootCmd() *cobra.Command {
 	return newVPSPowerCmd("reboot", "Reboot a VPS instance", "rebooted",
 		func(ctx context.Context, c *client.Client, id uint, timeout time.Duration) error {
-			_, err := c.VPS().RebootAndWait(ctx, id, client.WithPollMaxWait(timeout))
+			_, err := c.VPS().RebootAndWait(ctx, id, pollOpts(timeout)...)
 			return err
 		},
 		func(ctx context.Context, c *client.Client, id uint) error {
@@ -45,7 +45,6 @@ func newVPSRebootCmd() *cobra.Command {
 
 func newVPSReinstallCmd() *cobra.Command {
 	var (
-		yes     bool
 		wait    bool
 		timeout time.Duration
 	)
@@ -62,7 +61,7 @@ func newVPSReinstallCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Reinstall vps %q (id %d)? This wipes all data and cannot be undone.", v.DisplayName, id))
 				if err != nil {
 					return err
@@ -79,7 +78,7 @@ func newVPSReinstallCmd() *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "Action queued; poll `kumo vps get %s`\n", args[0])
 				return nil
 			}
-			if _, err := c.VPS().ReinstallAndWait(cmd.Context(), id, client.WithPollMaxWait(timeout)); err != nil {
+			if _, err := c.VPS().ReinstallAndWait(cmd.Context(), id, pollOpts(timeout)...); err != nil {
 				return mapVPSActionError(err, args[0], v.Status)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "VPS %d reinstalled\n", id)
@@ -87,7 +86,6 @@ func newVPSReinstallCmd() *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	f.BoolVar(&wait, "wait", true, "wait for the action to complete")
 	f.DurationVar(&timeout, "timeout", pollTimeout, "max time to wait when --wait is set")
 	return cmd

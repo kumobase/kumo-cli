@@ -136,7 +136,6 @@ func newAppsBuildsLogsCmd() *cobra.Command {
 }
 
 func newAppsBuildsRebuildCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "rebuild <app>",
 		Short: "Trigger a new build from the app's source",
@@ -150,7 +149,7 @@ func newAppsBuildsRebuildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Rebuild app %q from its latest source?", args[0]))
 				if err != nil {
 					return err
@@ -168,7 +167,6 @@ func newAppsBuildsRebuildCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

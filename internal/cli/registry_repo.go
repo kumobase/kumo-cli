@@ -199,7 +199,6 @@ func newRegistryRepoUpdateCmd() *cobra.Command {
 func newRegistryRepoDeleteCmd() *cobra.Command {
 	var (
 		orgSlug string
-		yes     bool
 	)
 	cmd := &cobra.Command{
 		Use:   "delete <name>",
@@ -215,7 +214,7 @@ func newRegistryRepoDeleteCmd() *cobra.Command {
 				return err
 			}
 			name := args[0]
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete repo %s/%s? This cannot be undone.", org, name))
 				if err != nil {
 					return err
@@ -234,7 +233,6 @@ func newRegistryRepoDeleteCmd() *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&orgSlug, "org", "", "organization slug (defaults to your sole org)")
-	f.BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -52,9 +51,7 @@ func TestVolumeListJSON(t *testing.T) {
 		t.Fatalf("volume list json: %v", err)
 	}
 	var got []map[string]any
-	if err := json.NewDecoder(strings.NewReader(out)).Decode(&got); err != nil && err != io.EOF {
-		t.Fatalf("decode json: %v", err)
-	}
+	decodeData(t, out, &got)
 	if len(got) != 1 || got[0]["name"] != "data" {
 		t.Errorf("unexpected json: %s", out)
 	}

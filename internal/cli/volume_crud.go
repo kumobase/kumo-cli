@@ -138,7 +138,6 @@ func mapVolumeCreateError(err error) error {
 }
 
 func newVolumeDeleteCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a volume",
@@ -152,7 +151,7 @@ func newVolumeDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete volume %q (id %d)? This cannot be undone.", v.Name, id))
 				if err != nil {
 					return err
@@ -172,6 +171,5 @@ func newVolumeDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }

@@ -183,7 +183,7 @@ func newRegistryOrgUpdateCmd() *cobra.Command {
 			if f.Changed("auto-create-repos") {
 				req.RegistryAutoCreateRepos = &autoCreate
 			}
-			o, err := c.Registry().Orgs().Update(cmd.Context(), args[0], req, client.IfMatch(etag))
+			o, err := c.Registry().Orgs().Update(cmd.Context(), args[0], req, writeOpts(etag)...)
 			if err != nil {
 				if errors.Is(err, client.ErrETagMismatch) {
 					return fmt.Errorf("org changed since it was read; re-run the update: %w", err)
@@ -202,7 +202,6 @@ func newRegistryOrgUpdateCmd() *cobra.Command {
 }
 
 func newRegistryOrgDeleteCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <slug>",
 		Short: "Delete a registry organization",
@@ -222,7 +221,7 @@ func newRegistryOrgDeleteCmd() *cobra.Command {
 			if o.IsDefault {
 				return fmt.Errorf("org %q is the default organization and cannot be deleted", slug)
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete org %q? This cannot be undone.", slug))
 				if err != nil {
 					return err
@@ -245,7 +244,6 @@ func newRegistryOrgDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

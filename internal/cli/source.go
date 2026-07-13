@@ -97,7 +97,6 @@ func newSourceReposCmd() *cobra.Command {
 }
 
 func newSourceDisconnectCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "disconnect <id>",
 		Short: "Disconnect a git source connection",
@@ -111,7 +110,7 @@ func newSourceDisconnectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Disconnect source connection %d? Git-build apps using it will stop building.", id))
 				if err != nil {
 					return err
@@ -128,7 +127,6 @@ func newSourceDisconnectCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

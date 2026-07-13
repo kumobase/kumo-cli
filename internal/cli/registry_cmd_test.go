@@ -61,9 +61,7 @@ func TestRegistryOrgListJSON(t *testing.T) {
 		t.Fatalf("registry org list json: %v", err)
 	}
 	var got []map[string]any
-	if err := json.NewDecoder(strings.NewReader(out)).Decode(&got); err != nil && err != io.EOF {
-		t.Fatalf("decode json: %v", err)
-	}
+	decodeData(t, out, &got)
 	if len(got) != 1 || got[0]["slug"] != "acme" {
 		t.Errorf("unexpected json: %s", out)
 	}

@@ -199,7 +199,7 @@ func newAppsCreateCmd() *cobra.Command {
 			}
 
 			fmt.Fprintf(cmd.ErrOrStderr(), "Deploying %q…\n", req.Name)
-			app, err := c.Apps().CreateAndWait(cmd.Context(), req, client.WithPollMaxWait(timeout))
+			app, err := c.Apps().CreateAndWait(cmd.Context(), req, pollOpts(timeout)...)
 			if err != nil {
 				return err
 			}
@@ -369,7 +369,7 @@ func newAppsUpdateCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			if err := c.Apps().Update(cmd.Context(), id, req, client.IfMatch(etag)); err != nil {
+			if err := c.Apps().Update(cmd.Context(), id, req, writeOpts(etag)...); err != nil {
 				if errors.Is(err, client.ErrETagMismatch) {
 					return fmt.Errorf("app changed since it was read; re-run the update: %w", err)
 				}
@@ -535,7 +535,6 @@ func validateAppSecrets(ctx context.Context, c *client.Client, refs []appSecretR
 
 func newAppsDeleteCmd() *cobra.Command {
 	var (
-		yes     bool
 		wait    bool
 		timeout time.Duration
 	)
@@ -552,7 +551,7 @@ func newAppsDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Delete app %q (id %d)? This cannot be undone.", app.Name, id))
 				if err != nil {
 					return err
@@ -578,7 +577,6 @@ func newAppsDeleteCmd() *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	f.BoolVar(&wait, "wait", false, "wait until the app is fully deleted")
 	f.DurationVar(&timeout, "timeout", pollTimeout, "max time to wait when --wait is set")
 	return cmd

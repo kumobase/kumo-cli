@@ -121,7 +121,6 @@ func newRegistryImageGetCmd() *cobra.Command {
 func newRegistryImageDeleteCmd() *cobra.Command {
 	var (
 		orgSlug string
-		yes     bool
 	)
 	cmd := &cobra.Command{
 		Use:   "delete <repo> <digest-or-tag>",
@@ -153,7 +152,7 @@ func newRegistryImageDeleteCmd() *cobra.Command {
 				digest = m.Digest
 			}
 
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf(
 					"Delete image %s from %s/%s? This removes ALL tags at that digest and cannot be undone.",
 					digest, org, repo))
@@ -174,7 +173,6 @@ func newRegistryImageDeleteCmd() *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&orgSlug, "org", "", "organization slug (defaults to your sole org)")
-	f.BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

@@ -91,7 +91,6 @@ func newVPSRenameCmd() *cobra.Command {
 }
 
 func newVPSCancelCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "cancel <name>",
 		Short: "Cancel auto-renewal; server runs until ExpiresAt",
@@ -105,7 +104,7 @@ func newVPSCancelCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Cancel auto-renew on vps %q (id %d)?", v.DisplayName, id))
 				if err != nil {
 					return err
@@ -126,7 +125,6 @@ func newVPSCancelCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

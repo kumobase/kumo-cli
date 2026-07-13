@@ -120,7 +120,7 @@ func newVolumeResizeCmd() *cobra.Command {
 			}
 			req := &types.ResizeVolumeRequest{SizeGB: size}
 			if wait {
-				res, err := c.Volumes().ResizeAndWait(cmd.Context(), id, req, client.WithPollMaxWait(timeout))
+				res, err := c.Volumes().ResizeAndWait(cmd.Context(), id, req, pollOpts(timeout)...)
 				if err != nil {
 					return mapVolumeResizeError(err, v.Status, v.Name)
 				}

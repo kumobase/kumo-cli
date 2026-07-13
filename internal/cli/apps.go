@@ -177,7 +177,14 @@ const pollTimeout = 10 * time.Minute
 // terminal state. It does not rely on server-side ordering.
 func waitForOperation(ctx context.Context, c *client.Client, appID uint, action types.AppOperationActionType, since time.Time, timeout time.Duration) (*types.AppOperation, error) {
 	deadline := time.Now().Add(timeout)
-	const interval = 2 * time.Second
+	// Geometric backoff (matches the SDK's *AndWait behaviour) so a long
+	// operation doesn't hammer the status endpoint.
+	const (
+		initialInterval = 2 * time.Second
+		maxInterval     = 30 * time.Second
+		backoffFactor   = 1.5
+	)
+	interval := initialInterval
 	for {
 		ops, _, err := c.Apps().ListOperations(ctx, appID)
 		if err != nil {
@@ -200,6 +207,9 @@ func waitForOperation(ctx context.Context, c *client.Client, appID uint, action 
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-time.After(interval):
+		}
+		if interval = time.Duration(float64(interval) * backoffFactor); interval > maxInterval {
+			interval = maxInterval
 		}
 	}
 }

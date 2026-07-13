@@ -46,7 +46,6 @@ func newVPSPasswordCmd() *cobra.Command {
 }
 
 func newVPSResetPasswordCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:   "reset-password <name>",
 		Short: "Reset the root password for a VPS instance",
@@ -60,7 +59,7 @@ func newVPSResetPasswordCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
+			if !flagYes {
 				ok, err := confirm(cmd, fmt.Sprintf("Reset root password for vps %q (id %d)?", v.DisplayName, id))
 				if err != nil {
 					return err
@@ -86,7 +85,6 @@ func newVPSResetPasswordCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 

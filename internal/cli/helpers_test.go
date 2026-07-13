@@ -2,12 +2,33 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 )
+
+// decodeData unwraps the "data" field of a -o json success envelope
+// ({"ok":true,"data":…}) into v, failing the test if the envelope is missing,
+// malformed, or reports ok=false.
+func decodeData(t *testing.T, out string, v any) {
+	t.Helper()
+	var env struct {
+		OK   bool            `json:"ok"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("decode envelope: %v (out=%s)", err, out)
+	}
+	if !env.OK {
+		t.Fatalf("envelope ok=false: %s", out)
+	}
+	if err := json.Unmarshal(env.Data, v); err != nil {
+		t.Fatalf("decode data: %v (data=%s)", err, env.Data)
+	}
+}
 
 // runCLI builds a fresh root command, runs it with the given args, and
 // returns captured stdout, stderr, and the execution error.
@@ -22,6 +43,11 @@ func runCLI(args ...string) (stdout, stderr string, err error) {
 	root.SetErr(&errBuf)
 	root.SetArgs(args)
 	err = root.Execute()
+	if err != nil {
+		// Mirror Execute's error rendering so tests see the same stderr
+		// (JSON error envelope or human line) the real entrypoint produces.
+		renderExecError(&errBuf, err)
+	}
 	return out.String(), errBuf.String(), err
 }
 
