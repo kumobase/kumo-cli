@@ -10,36 +10,20 @@ import (
 	"testing"
 )
 
-// decodeData unwraps the "data" field of a -o json success envelope
-// ({"ok":true,"data":…}) into v, failing the test if the envelope is missing,
-// malformed, or reports ok=false.
+// decodeData decodes a bare -o json success response (an object on stdout) into
+// v. Success output is emitted bare (aws/gh/kubectl convention).
 func decodeData(t *testing.T, out string, v any) {
 	t.Helper()
-	var env struct {
-		OK   bool            `json:"ok"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(out), &env); err != nil {
-		t.Fatalf("decode envelope: %v (out=%s)", err, out)
-	}
-	if !env.OK {
-		t.Fatalf("envelope ok=false: %s", out)
-	}
-	if err := json.Unmarshal(env.Data, v); err != nil {
-		t.Fatalf("decode data: %v (data=%s)", err, env.Data)
+	if err := json.Unmarshal([]byte(out), v); err != nil {
+		t.Fatalf("decode json: %v (out=%s)", err, out)
 	}
 }
 
-// decodeItems unwraps the "items" array of a -o json list envelope
-// ({"ok":true,"data":{"items":[…],"meta":…}}) into v.
+// decodeItems decodes a bare -o json list response (an array on stdout) into v.
 func decodeItems(t *testing.T, out string, v any) {
 	t.Helper()
-	var wrap struct {
-		Items json.RawMessage `json:"items"`
-	}
-	decodeData(t, out, &wrap)
-	if err := json.Unmarshal(wrap.Items, v); err != nil {
-		t.Fatalf("decode items: %v (items=%s)", err, wrap.Items)
+	if err := json.Unmarshal([]byte(out), v); err != nil {
+		t.Fatalf("decode json list: %v (out=%s)", err, out)
 	}
 }
 

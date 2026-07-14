@@ -20,13 +20,17 @@ func TestJSONErrorEnvelope(t *testing.T) {
 	srv := newServer(t, mux)
 	mockEnv(t, srv.URL)
 
-	_, stderr, err := runCLI("apps", "get", "missing", "-o", "json")
+	stdout, stderr, err := runCLI("apps", "get", "missing", "-o", "json")
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, want := range []string{`"ok": false`, `"code": "APP_NOT_FOUND"`, `"http_status": 404`} {
+	// stdout must stay empty on failure; the structured error goes to stderr.
+	if strings.TrimSpace(stdout) != "" {
+		t.Errorf("stdout should be empty on error, got: %s", stdout)
+	}
+	for _, want := range []string{`"error"`, `"code": "APP_NOT_FOUND"`, `"http_status": 404`} {
 		if !strings.Contains(stderr, want) {
-			t.Errorf("JSON error envelope missing %q: %s", want, stderr)
+			t.Errorf("JSON error on stderr missing %q: %s", want, stderr)
 		}
 	}
 

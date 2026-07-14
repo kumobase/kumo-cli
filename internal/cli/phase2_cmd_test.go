@@ -73,8 +73,8 @@ func TestDeclinedConfirmAbortsCleanly(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("declined confirm should not error: %v", err)
 	}
-	if !strings.Contains(out.String(), `"code": "ABORTED"`) {
-		t.Errorf("expected ABORTED envelope, got: %s", out.String())
+	if !strings.Contains(out.String(), `"aborted": true`) {
+		t.Errorf("expected {\"aborted\":true}, got: %s", out.String())
 	}
 }
 

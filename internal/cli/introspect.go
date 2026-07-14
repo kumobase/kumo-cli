@@ -5,8 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"github.com/kumobase/kumo-cli/internal/output"
 )
 
 // cmdInfo is the machine-readable description of one command in the tree.
@@ -39,7 +37,7 @@ func newIntrospectCmd() *cobra.Command {
 			tree := describeCommand(cmd.Root(), "kumo")
 			enc := json.NewEncoder(cmd.OutOrStdout())
 			enc.SetIndent("", "  ")
-			return enc.Encode(output.Envelope{OK: true, Data: tree})
+			return enc.Encode(tree)
 		},
 	}
 }

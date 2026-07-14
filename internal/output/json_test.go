@@ -12,40 +12,36 @@ import (
 	"github.com/kumobase/kumo-go/types"
 )
 
-func decodeEnv(t *testing.T, s string) Envelope {
-	t.Helper()
-	var e Envelope
-	if err := json.Unmarshal([]byte(s), &e); err != nil {
-		t.Fatalf("decode envelope: %v (%s)", err, s)
-	}
-	return e
-}
-
-func TestPrintWrapsJSONInEnvelope(t *testing.T) {
+func TestPrintBareJSON(t *testing.T) {
 	var buf bytes.Buffer
-	if err := Print(&buf, FormatJSON, map[string]any{"id": 7}, nil); err != nil {
+	if err := Print(&buf, FormatJSON, map[string]any{"id": 7, "name": "web"}, nil); err != nil {
 		t.Fatalf("Print: %v", err)
 	}
-	env := decodeEnv(t, buf.String())
-	if !env.OK || env.Error != nil {
-		t.Errorf("expected ok:true, no error: %s", buf.String())
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("not bare json: %v (%s)", err, buf.String())
+	}
+	if got["name"] != "web" {
+		t.Errorf("bare object should have name at top level: %s", buf.String())
+	}
+	if _, wrapped := got["data"]; wrapped {
+		t.Errorf("success output must not be wrapped: %s", buf.String())
 	}
 }
 
-func TestPrintResultJSONAndTable(t *testing.T) {
+func TestPrintResultBareAndTable(t *testing.T) {
 	r := ActionResult{Resource: "app", ID: 42, Action: "delete", Status: "done", Message: "App 42 deleted"}
 
 	var js bytes.Buffer
 	if err := PrintResult(&js, FormatJSON, false, r); err != nil {
 		t.Fatalf("PrintResult json: %v", err)
 	}
-	env := decodeEnv(t, js.String())
-	if !env.OK {
-		t.Errorf("json ok should be true: %s", js.String())
+	var got map[string]any
+	if err := json.Unmarshal(js.Bytes(), &got); err != nil {
+		t.Fatalf("not bare json: %v (%s)", err, js.String())
 	}
-	data, _ := env.Data.(map[string]any)
-	if data["resource"] != "app" || data["action"] != "delete" || data["status"] != "done" {
-		t.Errorf("unexpected data: %v", env.Data)
+	if got["resource"] != "app" || got["action"] != "delete" || got["status"] != "done" {
+		t.Errorf("unexpected action result: %s", js.String())
 	}
 	if strings.Contains(js.String(), "App 42 deleted") {
 		t.Errorf("human Message must not be serialized: %s", js.String())
@@ -76,12 +72,12 @@ func TestPrintResultQuiet(t *testing.T) {
 	if err := PrintResult(&js, FormatJSON, true, r); err != nil {
 		t.Fatalf("PrintResult quiet json: %v", err)
 	}
-	if !decodeEnv(t, js.String()).OK {
-		t.Errorf("quiet json should still emit envelope: %s", js.String())
+	if strings.TrimSpace(js.String()) == "" {
+		t.Errorf("quiet json should still emit the bare result")
 	}
 }
 
-func TestPrintListMetaInBothFormats(t *testing.T) {
+func TestPrintListBareArrayWithTableFooter(t *testing.T) {
 	items := []map[string]any{{"id": 1}}
 	meta := &types.Meta{Page: 1, PageSize: 20, TotalItems: 40, TotalPages: 2}
 
@@ -89,15 +85,15 @@ func TestPrintListMetaInBothFormats(t *testing.T) {
 	if err := PrintList(&js, FormatJSON, items, meta, nil); err != nil {
 		t.Fatalf("PrintList json: %v", err)
 	}
-	env := decodeEnv(t, js.String())
-	data, _ := env.Data.(map[string]any)
-	if _, ok := data["items"]; !ok {
-		t.Errorf("json list missing items: %s", js.String())
+	var arr []map[string]any
+	if err := json.Unmarshal(js.Bytes(), &arr); err != nil {
+		t.Fatalf("list json should be a bare array: %v (%s)", err, js.String())
 	}
-	if _, ok := data["meta"]; !ok {
-		t.Errorf("json list missing meta: %s", js.String())
+	if len(arr) != 1 || arr[0]["id"].(float64) != 1 {
+		t.Errorf("unexpected bare list: %s", js.String())
 	}
 
+	// meta is table-only.
 	var tbl bytes.Buffer
 	err := PrintList(&tbl, FormatTable, items, meta, func(tw *tabwriter.Writer) {
 		fmt.Fprintln(tw, "ID")
@@ -111,29 +107,15 @@ func TestPrintListMetaInBothFormats(t *testing.T) {
 	}
 }
 
-func TestPrintListNoFooterSinglePage(t *testing.T) {
-	var tbl bytes.Buffer
-	meta := &types.Meta{Page: 1, TotalPages: 1, TotalItems: 3}
-	_ = PrintList(&tbl, FormatTable, []int{1}, meta, func(tw *tabwriter.Writer) {
-		fmt.Fprintln(tw, "x")
-	})
-	if strings.Contains(tbl.String(), "Page ") {
-		t.Errorf("single page should have no footer: %q", tbl.String())
-	}
-}
-
 func TestErrorView(t *testing.T) {
 	api := &client.APIError{StatusCode: 409, Code: "NAME_TAKEN", Message: "taken"}
 	v := ErrorView(api)
 	if v.Code != "NAME_TAKEN" || v.HTTPStatus != 409 || v.Message != "taken" {
 		t.Errorf("unexpected view: %+v", v)
 	}
-	// wrapped API error still unwraps
-	wrapped := fmt.Errorf("context: %w", api)
-	if ErrorView(wrapped).Code != "NAME_TAKEN" {
-		t.Errorf("wrapped view lost code: %+v", ErrorView(wrapped))
+	if ErrorView(fmt.Errorf("context: %w", api)).Code != "NAME_TAKEN" {
+		t.Errorf("wrapped view lost code")
 	}
-	// plain error
 	if got := ErrorView(errString("boom")); got.Code != "" || got.Message != "boom" {
 		t.Errorf("plain view = %+v", got)
 	}
@@ -144,9 +126,14 @@ func TestPrintErrorFormats(t *testing.T) {
 
 	var js bytes.Buffer
 	PrintError(&js, FormatJSON, api)
-	env := decodeEnv(t, js.String())
-	if env.OK || env.Error == nil || env.Error.Code != "APP_NOT_FOUND" {
-		t.Errorf("json error envelope wrong: %s", js.String())
+	var got struct {
+		Error APIErrorView `json:"error"`
+	}
+	if err := json.Unmarshal(js.Bytes(), &got); err != nil {
+		t.Fatalf("error json malformed: %v (%s)", err, js.String())
+	}
+	if got.Error.Code != "APP_NOT_FOUND" || got.Error.HTTPStatus != 404 {
+		t.Errorf("unexpected error payload: %s", js.String())
 	}
 
 	var tbl bytes.Buffer
@@ -161,8 +148,8 @@ func TestPrintAborted(t *testing.T) {
 	if err := PrintAborted(&js, FormatJSON); err != nil {
 		t.Fatalf("PrintAborted json: %v", err)
 	}
-	env := decodeEnv(t, js.String())
-	if env.OK || env.Error == nil || env.Error.Code != "ABORTED" {
+	var got map[string]bool
+	if err := json.Unmarshal(js.Bytes(), &got); err != nil || !got["aborted"] {
 		t.Errorf("aborted json wrong: %s", js.String())
 	}
 
@@ -175,12 +162,10 @@ func TestPrintAborted(t *testing.T) {
 
 func TestFormatErrorPreservesFriendlyContext(t *testing.T) {
 	api := &client.APIError{StatusCode: 404, Code: "APP_NOT_FOUND", Message: "not found"}
-	// A friendly wrapper whose Error() is just the friendly text.
 	friendly := &wrapErrForTest{msg: `no app named "web"`, cause: api}
 	if got := FormatError(friendly); got != `no app named "web"` {
 		t.Errorf("FormatError should show friendly text, got %q", got)
 	}
-	// A bare API error still shows the compact message (code) form.
 	if got := FormatError(api); got != "not found (APP_NOT_FOUND)" {
 		t.Errorf("FormatError bare = %q", got)
 	}

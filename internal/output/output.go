@@ -28,12 +28,13 @@ func Valid(format string) bool {
 // Use tab ('\t') as the column separator.
 type TableFunc func(tw *tabwriter.Writer)
 
-// Print renders data as JSON, or invokes table to render a human table,
-// depending on format.
+// Print renders data as bare JSON, or invokes table to render a human table,
+// depending on format. In JSON mode the data object/array is emitted directly on
+// stdout (aws/gh/kubectl convention); errors go to stderr via PrintError.
 func Print(w io.Writer, format string, data any, table TableFunc) error {
 	switch format {
 	case FormatJSON:
-		return encodeJSON(w, Envelope{OK: true, Data: data})
+		return encodeJSON(w, data)
 	case FormatTable:
 		tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 		table(tw)
@@ -64,14 +65,6 @@ func FormatError(err error) string {
 	return err.Error()
 }
 
-// Envelope is the machine-readable wrapper for every -o json response. Agents
-// branch on OK; exactly one of Data / Error is populated.
-type Envelope struct {
-	OK    bool          `json:"ok"`
-	Data  any           `json:"data,omitempty"`
-	Error *APIErrorView `json:"error,omitempty"`
-}
-
 // APIErrorView is the stable JSON error shape. Code is the server's wire code
 // (empty for local/client errors); Message may evolve and should not be parsed.
 type APIErrorView struct {
@@ -80,8 +73,15 @@ type APIErrorView struct {
 	HTTPStatus int    `json:"http_status,omitempty"`
 }
 
+// errorPayload is the -o json failure shape emitted on stderr: the view under an
+// "error" key so it is self-describing and distinct from success data on stdout.
+type errorPayload struct {
+	Error APIErrorView `json:"error"`
+}
+
 // ActionResult is the canonical -o json payload for a mutation/lifecycle
-// outcome. Message carries the human table line and is never serialized.
+// outcome, emitted bare on stdout. Message carries the human table line and is
+// never serialized.
 type ActionResult struct {
 	Resource    string `json:"resource"`
 	ID          uint   `json:"id,omitempty"`
@@ -91,23 +91,17 @@ type ActionResult struct {
 	Message     string `json:"-"`
 }
 
-// listPayload wraps list results so pagination metadata reaches JSON output.
-type listPayload struct {
-	Items any         `json:"items"`
-	Meta  *types.Meta `json:"meta,omitempty"`
-}
-
 func encodeJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
 }
 
-// PrintResult renders a mutation/lifecycle outcome. In JSON it emits a success
-// envelope; in table mode it writes the human line unless quiet is set.
+// PrintResult renders a mutation/lifecycle outcome. In JSON it emits the bare
+// action result; in table mode it writes the human line unless quiet is set.
 func PrintResult(w io.Writer, format string, quiet bool, r ActionResult) error {
 	if format == FormatJSON {
-		return encodeJSON(w, Envelope{OK: true, Data: r})
+		return encodeJSON(w, r)
 	}
 	if quiet || r.Message == "" {
 		return nil
@@ -116,12 +110,13 @@ func PrintResult(w io.Writer, format string, quiet bool, r ActionResult) error {
 	return err
 }
 
-// PrintList renders a list result with optional pagination metadata in both
-// output formats. items is the slice to render; meta may be nil.
+// PrintList renders a list result. In JSON it emits the bare array (pagination
+// metadata is table-only, matching the aws/kubectl convention). items is the
+// slice to render; meta may be nil.
 func PrintList(w io.Writer, format string, items any, meta *types.Meta, table TableFunc) error {
 	switch format {
 	case FormatJSON:
-		return encodeJSON(w, Envelope{OK: true, Data: listPayload{Items: items, Meta: meta}})
+		return encodeJSON(w, items)
 	case FormatTable:
 		tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 		table(tw)
@@ -140,12 +135,12 @@ func writePageFooter(tw *tabwriter.Writer, meta *types.Meta) {
 	}
 }
 
-// PrintAborted reports a user-declined confirmation. In JSON it emits an
-// {"ok":false,"error":{"code":"ABORTED"}} envelope; in table mode a short line.
-// The caller returns nil (exit 0) — an abort is a user choice, not a failure.
+// PrintAborted reports a user-declined confirmation. In JSON it emits
+// {"aborted":true} (keeping stdout a valid JSON document); in table mode a short
+// line. The caller returns nil (exit 0) — an abort is a user choice, not a failure.
 func PrintAborted(w io.Writer, format string) error {
 	if format == FormatJSON {
-		return encodeJSON(w, Envelope{OK: false, Error: &APIErrorView{Code: "ABORTED", Message: "aborted by user"}})
+		return encodeJSON(w, map[string]bool{"aborted": true})
 	}
 	_, err := fmt.Fprintln(w, "Aborted.")
 	return err
@@ -160,12 +155,11 @@ func ErrorView(err error) APIErrorView {
 	return APIErrorView{Message: err.Error()}
 }
 
-// PrintError writes a failure to w: a JSON error envelope when format is JSON,
-// otherwise the familiar human "Error: …" line.
+// PrintError writes a failure to w (stderr): a structured {"error":{…}} JSON
+// object when format is JSON, otherwise the familiar human "Error: …" line.
 func PrintError(w io.Writer, format string, err error) {
 	if format == FormatJSON {
-		view := ErrorView(err)
-		_ = encodeJSON(w, Envelope{OK: false, Error: &view})
+		_ = encodeJSON(w, errorPayload{Error: ErrorView(err)})
 		return
 	}
 	fmt.Fprintln(w, "Error: "+FormatError(err))
