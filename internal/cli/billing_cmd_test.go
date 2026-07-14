@@ -29,7 +29,9 @@ func TestBillingSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("billing summary: %v", err)
 	}
-	for _, want := range []string{"Currency:", "IDR", "Charged so far:", "45000.00", "Accruing", "5000.00"} {
+	for _, want := range []string{"Currency:", "IDR", "Charged so far:", "45000.00", "Accruing", "5000.00",
+		// per-product section
+		"PRODUCT", "CHARGED", "ACCRUING", "app"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("summary missing %q: %s", want, out)
 		}
