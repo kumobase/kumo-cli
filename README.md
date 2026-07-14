@@ -10,11 +10,15 @@ a thin wrapper over the official Go SDK
 |---|---|
 | `kumo auth` | Sign in with an API key, view active identity, sign out |
 | `kumo apps` | Deploy and manage applications (create, update, start/stop, domains, operations history) |
+| `kumo jobs` | One-off and scheduled jobs, and their execution history |
 | `kumo secret` | Registry credentials, env-var groups, and file-mount secrets |
 | `kumo apikey` | Inspect personal and registry-scoped API keys (read-only) |
 | `kumo registry` | Container registry: organizations, repositories, images, and `docker login` |
 | `kumo volume` | Persistent volumes: create, attach/detach, online resize |
 | `kumo vps` | Virtual servers: rent, list plans/regions, lifecycle (start/stop/reboot/reinstall), SSH shortcut |
+| `kumo billing` | Account balance, usage charges, and cost breakdown |
+| `kumo source` | Inspect git source connections (GitHub/GitLab) used for git-build apps |
+| `kumo runners` | Inspect VM-backed CI runner jobs |
 
 Run `kumo <group> --help` for the full subcommand list and `kumo <group> <cmd> --help` for flags.
 
@@ -81,13 +85,62 @@ Multiple **profiles** are supported via `--profile` / `KUMO_PROFILE` (default
 3. selected profile in the config files
 4. built-in default (base URL `https://api.kumo.run`, output `table`)
 
-Every command prints a human-readable table by default. Pass `-o json` /
-`--output json` for machine-readable output.
+### Global flags
+
+These apply to every command:
+
+| Flag | Purpose |
+|---|---|
+| `-o, --output table\|json` | output format (default `table`) |
+| `--profile`, `--base-url` | select profile / override the API base URL |
+| `-y, --yes` | skip confirmation prompts on destructive commands |
+| `-q, --quiet` | suppress progress/success chatter (stdout stays machine-clean) |
+| `--idempotency-key <key>` | make a write safely retryable (see below) |
+
+## Output & scripting
+
+Every command prints a human-readable **table** by default. Pass `-o json` for
+machine-readable output, designed to be driven by scripts and AI agents:
+
+- **Success** prints the **bare** result on **stdout** — an object for
+  `get`/detail and mutations, an array for `list` — following the
+  `aws`/`gh`/`kubectl` convention:
+
+  ```bash
+  kumo apps get web -o json        # {"id":42,"name":"web","status":"running",…}
+  kumo apps list -o json           # [ {…}, {…} ]
+  kumo apps stop web -o json       # {"resource":"app","id":42,"action":"stop","status":"done"}
+  ```
+
+- **Errors** print a structured object on **stderr** (stdout stays empty), so a
+  stable `code` can be branched on without parsing prose:
+
+  ```json
+  {"error":{"code":"APP_NOT_FOUND","message":"no app named \"web\"","http_status":404}}
+  ```
+
+- **Exit codes** classify the failure so callers can react without reading text:
+
+  | Code | Meaning | | Code | Meaning |
+  |---|---|---|---|---|
+  | `0` | success | | `5` | conflict (incl. ambiguous name, in-use) |
+  | `2` | usage / bad flags | | `6` | validation |
+  | `3` | authentication | | `7` | etag mismatch (concurrent modification) |
+  | `4` | not found | | `1` | other |
+
+- **`kumo introspect`** emits the full command/flag tree as JSON, so an agent can
+  discover the surface without scraping `--help`.
+
+- **Idempotency:** a retried write can double-provision or double-bill. Pass a
+  stable `--idempotency-key <key>` and the server collapses retries of the *same*
+  request to a single effect.
 
 ## Quick tour
 
-Resources are addressed by **name** (per-user unique). If a name matches more
-than one resource the CLI reports `AMBIGUOUS_NAME` and asks you to rename one.
+Resources are addressed by **name** (per-user unique). A bare **numeric id** is
+treated as an id, which is the recovery when a name is ambiguous: if a name
+matches more than one resource the CLI reports `AMBIGUOUS_NAME`, and you can pass
+the id from `kumo <group> list` instead.
 
 ```bash
 # Apps — declarative deploys from a manifest, or one-shot flags
@@ -95,10 +148,15 @@ kumo apps create -f app.yaml
 kumo apps update web --replicas 3
 kumo apps stop web && kumo apps start web
 
-# Secrets — registry creds, env-var groups, file mounts
-kumo secret create --name dockerhub --type registry \
-  --registry-username alice --registry-password '***'
+# Secrets — keep the password out of shell history via stdin
+printf '%s' "$TOKEN" | kumo secret create --name dockerhub --type registry \
+  --registry-username alice --registry-password-stdin
 kumo secret list
+
+# Jobs — one-off or scheduled, and follow a run to completion
+kumo jobs create --name migrate --image myrepo/tools:v1 --command "./migrate"
+kumo jobs run migrate --wait           # exits non-zero if the execution fails
+kumo jobs list --kind scheduled
 
 # Container registry — push images via docker, browse via the CLI
 kumo registry login                    # shells `docker login` using your stored key
@@ -110,13 +168,16 @@ kumo registry image list myapp
 kumo volume create --name data --tier ssd --size 5 --app web --mount /data
 kumo volume resize data --size 20      # waits until ready
 
-# VPS — rent a server, manage its lifecycle, jump in over SSH
-kumo vps regions
+# VPS — rent a server (optionally wait until running), manage its lifecycle
 kumo vps plans --region sg-singapore
-kumo vps rent --name box1 --provider zeabur --region sg-singapore --plan <id>
+kumo vps rent --name box1 --provider zeabur --region sg-singapore --plan <id> --wait
 kumo vps password box1                 # reveal the initial password
 kumo vps ssh box1                      # exec `ssh root@<ip> -p <port>`
 kumo vps stop box1 && kumo vps start box1
+
+# Billing — check your prepaid balance and usage
+kumo billing balance
+kumo billing summary
 ```
 
 ## Manifest example
@@ -124,6 +185,12 @@ kumo vps stop box1 && kumo vps start box1
 For full app specs (env vars, health checks, autoscaling), use a manifest with
 `-f`. Flags override manifest values when both are given. A complete example
 lives at [`testdata/app.yaml`](./testdata/app.yaml).
+
+The same fields are also available as `create`/`update` flags —
+`--autoscale`/`--min-replicas`/`--max-replicas`/`--cpu-target`/`--mem-target` and
+`--health-check-type`/`--health-check-path`/`--health-check-port` — so you can
+enable them without a manifest. When updating with a partial manifest, only the
+fields present in the file are changed; omitted fields keep their current value.
 
 ```yaml
 name: my-demo-app
