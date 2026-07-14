@@ -73,19 +73,47 @@ detect_arch() {
 
 # Resolve version ---------------------------------------------------------
 
+# latest_tag_via_redirect prints the latest release tag by following the
+# github.com "releases/latest" redirect (→ /releases/tag/vX.Y.Z). It uses the
+# github.com host, which — unlike api.github.com — is NOT subject to the
+# 60-request/hour anonymous rate limit that 403s on shared / CI / container IPs.
+# Prints nothing if the tag can't be determined (caller falls back to the API).
+latest_tag_via_redirect() {
+  url="https://github.com/$GH_REPO/releases/latest"
+  eff=""
+  if have curl; then
+    eff=$(curl -sSL -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null) || eff=""
+  elif have wget; then
+    # Stop at the first redirect and read the Location header (GNU wget). On
+    # wget builds without -S/--max-redirect this yields nothing and we fall back.
+    eff=$(wget -q -S --max-redirect=0 -O /dev/null "$url" 2>&1 \
+            | sed -n 's/^[[:space:]]*[Ll]ocation:[[:space:]]*//p' | head -n1 | tr -d '\r')
+  fi
+  case "$eff" in
+    */releases/tag/*) printf '%s\n' "${eff##*/tag/}" ;;
+    *) : ;;  # no releases yet / unexpected shape → print nothing
+  esac
+}
+
+# latest_tag_via_api prints the latest tag via the GitHub API. Fallback only —
+# it is subject to the anonymous rate limit and may 403.
+latest_tag_via_api() {
+  api="https://api.github.com/repos/$GH_REPO/releases/latest"
+  tmp=$(mktemp)
+  if $DL "$tmp" "$api" 2>/dev/null; then
+    grep -m1 '"tag_name":' "$tmp" | sed -e 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/'
+  fi
+  rm -f "$tmp"
+}
+
 resolve_version() {
   if [ -n "${KUMO_VERSION:-}" ]; then
     echo "$KUMO_VERSION"; return
   fi
   info "looking up latest release of $GH_REPO"
-  api="https://api.github.com/repos/$GH_REPO/releases/latest"
-  # Pipe via tmpfile so we don't depend on jq.
-  tmp=$(mktemp)
-  trap 'rm -f "$tmp"' EXIT
-  $DL "$tmp" "$api" || fatal "failed to query $api"
-  ver=$(grep -m1 '"tag_name":' "$tmp" | sed -e 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/')
-  rm -f "$tmp"; trap - EXIT
-  [ -n "$ver" ] || fatal "could not parse latest tag from GitHub API response"
+  ver=$(latest_tag_via_redirect)
+  [ -n "$ver" ] || ver=$(latest_tag_via_api)
+  [ -n "$ver" ] || fatal "could not determine the latest release (GitHub may be rate-limiting this IP). Pin a version instead: curl -sSfL .../install.sh | KUMO_VERSION=vX.Y.Z sh"
   echo "$ver"
 }
 
