@@ -82,6 +82,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newSecretCmd())
 	root.AddCommand(newAPIKeyCmd())
 	root.AddCommand(newRegistryCmd())
+	root.AddCommand(newPackagesCmd())
 	root.AddCommand(newVolumeCmd())
 	root.AddCommand(newVPSCmd())
 	root.AddCommand(newBillingCmd())

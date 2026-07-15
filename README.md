@@ -14,6 +14,7 @@ a thin wrapper over the official Go SDK
 | `kumo secret` | Registry credentials, env-var groups, and file-mount secrets |
 | `kumo apikey` | Inspect personal and registry-scoped API keys (read-only) |
 | `kumo registry` | Container registry: organizations, repositories, images, and `docker login` |
+| `kumo packages` | Kumo Packages: browse and unpublish npm, maven, pypi, nuget, and rubygems packages |
 | `kumo volume` | Persistent volumes: create, attach/detach, online resize |
 | `kumo vps` | Virtual servers: rent, list plans/regions, lifecycle (start/stop/reboot/reinstall), SSH shortcut |
 | `kumo billing` | Account balance, usage charges, and cost breakdown |
@@ -163,6 +164,13 @@ kumo registry login                    # shells `docker login` using your stored
 kumo registry repo create myapp
 docker push registry.kumo.run/<org>/myapp:1
 kumo registry image list myapp
+
+# Kumo Packages — publish with the native tool, browse and unpublish via the CLI
+npm publish                            # npm/mvn/twine talk to Kumo directly
+kumo packages list
+kumo packages get '@acme/utils'        # --format is inferred when the name is unique
+kumo packages get utils --format pypi  # a name can exist in several ecosystems
+kumo packages version delete '@acme/utils' 1.1.0
 
 # Volumes — create, attach to an app, resize online
 kumo volume create --name data --tier ssd --size 5 --app web --mount /data

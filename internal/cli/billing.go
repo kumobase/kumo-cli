@@ -70,7 +70,9 @@ func newBillingSummaryCmd() *cobra.Command {
 				fmt.Fprintf(tw, "Previous period total:\t%s\n", sum.PreviousPeriodTotal)
 				fmt.Fprintln(tw, "\nPRODUCT\tCHARGED\tACCRUING")
 				for _, p := range productBreakdownRows(cp.ByProduct, cp.Accruing) {
-					fmt.Fprintf(tw, "%s\t%s\t%s\n", p.name, p.charged, p.accruing)
+					// orDash: a server predating a product omits its key, which
+					// would otherwise render as two blank columns.
+					fmt.Fprintf(tw, "%s\t%s\t%s\n", p.name, orDash(p.charged), orDash(p.accruing))
 				}
 			})
 		},
@@ -246,6 +248,7 @@ func productBreakdownRows(charged, accruing types.ProductBreakdown) []productRow
 		{"database", charged.Database, accruing.Database},
 		{"jobs", charged.Jobs, accruing.Jobs},
 		{"vm_runners", charged.VMRunners, accruing.VMRunners},
+		{"packages", charged.Packages, accruing.Packages},
 	}
 }
 

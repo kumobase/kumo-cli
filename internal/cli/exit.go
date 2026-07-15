@@ -50,15 +50,20 @@ func exitCodeFor(err error) int {
 		return 0
 	case isUsageError(err):
 		return 2
-	case errors.Is(err, kumoclient.ErrNotLoggedIn), client.IsCode(err, codes.Unauthorized):
+	case errors.Is(err, kumoclient.ErrNotLoggedIn), client.IsCode(err, codes.Unauthorized),
+		client.IsCode(err, codes.PackageAuthRequired), client.IsCode(err, codes.PackageForbidden):
 		return 3
-	case client.IsNotFound(err):
+	case client.IsNotFound(err), errors.Is(err, errPackageNotFound):
 		return 4
-	case client.IsConflict(err), client.IsCode(err, codes.AmbiguousName):
+	case client.IsConflict(err), client.IsCode(err, codes.AmbiguousName),
+		errors.Is(err, errAmbiguousFormat):
 		return 5
 	case errors.Is(err, client.ErrValidationFailed),
 		client.IsCode(err, codes.InvalidResourceName),
-		errors.Is(err, client.ErrInvalidFilterCombination):
+		errors.Is(err, client.ErrInvalidFilterCombination),
+		client.IsCode(err, codes.PackageInvalidName),
+		client.IsCode(err, codes.PackageInvalidVersion),
+		client.IsCode(err, codes.PackageInvalidFormat):
 		return 6
 	case errors.Is(err, client.ErrETagMismatch):
 		return 7

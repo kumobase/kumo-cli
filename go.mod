@@ -3,7 +3,7 @@ module github.com/kumobase/kumo-cli
 go 1.24.2
 
 require (
-	github.com/kumobase/kumo-go v0.36.0
+	github.com/kumobase/kumo-go v0.39.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	golang.org/x/term v0.27.0
